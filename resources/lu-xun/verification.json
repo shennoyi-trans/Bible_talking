@@ -1,0 +1,206 @@
+{
+  "verified_date": "2026-10-22",
+  "records": 41832,
+  "parsed_fragments": 42998,
+  "characters": 2887007,
+  "files": [
+    {
+      "file": "坟.jsonl",
+      "records": 534,
+      "parsed_fragments": 756,
+      "bytes": 596271
+    },
+    {
+      "file": "热风.jsonl",
+      "records": 430,
+      "parsed_fragments": 438,
+      "bytes": 328716
+    },
+    {
+      "file": "呐喊.jsonl",
+      "records": 991,
+      "parsed_fragments": 999,
+      "bytes": 673026
+    },
+    {
+      "file": "彷徨.jsonl",
+      "records": 1028,
+      "parsed_fragments": 1036,
+      "bytes": 695924
+    },
+    {
+      "file": "野草.jsonl",
+      "records": 451,
+      "parsed_fragments": 451,
+      "bytes": 272584
+    },
+    {
+      "file": "朝花夕拾.jsonl",
+      "records": 373,
+      "parsed_fragments": 390,
+      "bytes": 307205
+    },
+    {
+      "file": "故事新编.jsonl",
+      "records": 988,
+      "parsed_fragments": 988,
+      "bytes": 639762
+    },
+    {
+      "file": "华盖集.jsonl",
+      "records": 552,
+      "parsed_fragments": 569,
+      "bytes": 474013
+    },
+    {
+      "file": "华盖集续编.jsonl",
+      "records": 668,
+      "parsed_fragments": 705,
+      "bytes": 599788
+    },
+    {
+      "file": "而已集.jsonl",
+      "records": 641,
+      "parsed_fragments": 671,
+      "bytes": 523438
+    },
+    {
+      "file": "三闲集.jsonl",
+      "records": 568,
+      "parsed_fragments": 593,
+      "bytes": 493108
+    },
+    {
+      "file": "二心集.jsonl",
+      "records": 702,
+      "parsed_fragments": 776,
+      "bytes": 655076
+    },
+    {
+      "file": "南腔北调集.jsonl",
+      "records": 669,
+      "parsed_fragments": 684,
+      "bytes": 606776
+    },
+    {
+      "file": "伪自由书.jsonl",
+      "records": 718,
+      "parsed_fragments": 745,
+      "bytes": 565430
+    },
+    {
+      "file": "准风月谈.jsonl",
+      "records": 876,
+      "parsed_fragments": 885,
+      "bytes": 689440
+    },
+    {
+      "file": "花边文学.jsonl",
+      "records": 562,
+      "parsed_fragments": 564,
+      "bytes": 453042
+    },
+    {
+      "file": "且介亭杂文.jsonl",
+      "records": 582,
+      "parsed_fragments": 598,
+      "bytes": 548670
+    },
+    {
+      "file": "且介亭杂文二集.jsonl",
+      "records": 601,
+      "parsed_fragments": 644,
+      "bytes": 620239
+    },
+    {
+      "file": "且介亭杂文末编.jsonl",
+      "records": 500,
+      "parsed_fragments": 552,
+      "bytes": 472454
+    },
+    {
+      "file": "集外集.jsonl",
+      "records": 694,
+      "parsed_fragments": 736,
+      "bytes": 576975
+    },
+    {
+      "file": "集外集拾遗.jsonl",
+      "records": 832,
+      "parsed_fragments": 862,
+      "bytes": 696817
+    },
+    {
+      "file": "集外集拾遗补编.jsonl",
+      "records": 1966,
+      "parsed_fragments": 2102,
+      "bytes": 1576833
+    },
+    {
+      "file": "中国小说史略.jsonl",
+      "records": 644,
+      "parsed_fragments": 795,
+      "bytes": 762402
+    },
+    {
+      "file": "中国小说的历史的变迁.jsonl",
+      "records": 74,
+      "parsed_fragments": 127,
+      "bytes": 110019
+    },
+    {
+      "file": "汉文学史纲要.jsonl",
+      "records": 207,
+      "parsed_fragments": 215,
+      "bytes": 193702
+    },
+    {
+      "file": "古籍序跋集.jsonl",
+      "records": 268,
+      "parsed_fragments": 324,
+      "bytes": 265806
+    },
+    {
+      "file": "译文序跋集.jsonl",
+      "records": 922,
+      "parsed_fragments": 942,
+      "bytes": 779414
+    },
+    {
+      "file": "两地书.jsonl",
+      "records": 683,
+      "parsed_fragments": 703,
+      "bytes": 586601
+    },
+    {
+      "file": "书信（1904—1936）.jsonl",
+      "records": 10174,
+      "parsed_fragments": 10214,
+      "bytes": 7041704
+    },
+    {
+      "file": "鲁迅日记（1912—1936）.jsonl",
+      "records": 12934,
+      "parsed_fragments": 12934,
+      "bytes": 7931464
+    }
+  ],
+  "checks": [
+    "原始缓存与全部导入文件SHA-256一致",
+    "每段与可定位的源文本经声明清洗后完全一致",
+    "按原文集名称分文件，段落文集与文件名逐条匹配；无旧分卷文件残留",
+    "所有文件通过项目parse_upload，字符偏移逐条核对通过",
+    "单文件均低于10MiB",
+    "三部小说集14+11+8篇标题齐备",
+    "25个日记年度单元齐备（1922仅断片）",
+    "无替换字符、私用区字符和数字注释段落",
+    "许广平末编后记未混入",
+    "与重分组前41832条段落的文本、source_id、段落号及来源网址多重集合完全一致"
+  ],
+  "not_verified": [
+    "未逐字与纸本校勘",
+    "未批量检查在线链接未来可用性",
+    "未建立向量索引或评价真实模型召回率",
+    "未完成逐段引文/译文作者判定"
+  ]
+}

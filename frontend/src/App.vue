@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { isNative, nativeApi } from './native'
+import { readZip, ZIP_LIMIT, FILE_LIMIT } from './zip-upload'
 import { ArrowUpRight, ArrowRight, BookOpen, Check, ChevronDown, ChevronUp, Copy, FileText, Library, LoaderCircle, Plus, Search, Upload, X, RotateCw, Archive, ArrowLeft, Trash2, MoreHorizontal } from 'lucide-vue-next'
 
 const page = ref('search'), corpora = ref([]), selected = ref('corpus_cuv'), query = ref(''), results = ref([])
@@ -9,8 +10,14 @@ const topK = ref(50), indexing = ref(false), contexts = ref({}), expanded = ref(
 const resources = ref([]), modal = ref(false), name = ref(''), description = ref(''), saving = ref(false)
 const fileInput = ref(null), file = ref(null), preview = ref(null), uploading = ref(false), drag = ref(false)
 const pendingArchive = ref(null), uploadCorpus = ref(''), previewToken = ref(0)
+const zipEntries = ref(null), zipSkipped = ref([]), uploadProgress = ref(''), uploadError = ref('')
+const chosenZipEntries = computed(() => (zipEntries.value || []).filter(entry => entry.selected))
+const zipCount = computed(() => chosenZipEntries.value.reduce((count, entry) => count + (entry.preview?.count || 0), 0))
+const zipCanImport = computed(() => chosenZipEntries.value.some(entry => entry.status !== 'done') && chosenZipEntries.value.every(entry => entry.preview && !entry.error))
 const selectorOpen = ref(false), corpusMenu = ref(null), pendingCorpusDelete = ref(null), deletingCorpus = ref(false)
 const archivedCorpora = ref([]), resourcesOpen = ref(true), reader = ref(null), readerBusy = ref(false)
+const serverMode = ref(false)
+const libraryLabel = computed(() => serverMode.value ? '共享语料库' : '我的语料库')
 let readerRequest = 0
 const corpus = computed(() => corpora.value.find(c => c.corpus_id === selected.value))
 const examples = ['可以给我水喝吗？', '你要去哪里？', '别为明天的事担心', '有人出卖了我']
@@ -18,7 +25,9 @@ let timer, toastTimer, requestNumber = 0
 
 async function api(path, options = {}) {
   if (isNative()) return nativeApi(path, options)
-  const response = await fetch('/api' + path, options)
+  // Relative to the document directory, so the same build supports / and /Bible_talking/.
+  const response = await fetch(new URL('api' + path, document.baseURI), { ...options,
+    headers: { ...options.headers, 'X-Bible-Request': '1' } })
   const value = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(typeof value.detail === 'string' ? value.detail : '请求未能完成，请稍后再试。')
   return value
@@ -46,6 +55,7 @@ function changeCorpus() {
   loading.value = false
   results.value = []; hasSearched.value = false; expanded.value = {}; contexts.value = {}
   file.value = null; preview.value = null; previewToken.value++
+  zipEntries.value = null; zipSkipped.value = []; uploadError.value = ''; uploadProgress.value = ''
   if (fileInput.value) fileInput.value.value = ''
   refresh()
 }
@@ -88,18 +98,75 @@ async function createCorpus() {
 }
 async function selectFile(candidate) {
   if (!candidate || uploading.value) return
-  if (candidate.size > 10 * 1024 * 1024) { notify('文件不能超过 10 MB。'); return }
+  if (fileInput.value) fileInput.value.value = ''
+  const isZip = candidate.name.toLowerCase().endsWith('.zip')
+  if (candidate.size > (isZip ? ZIP_LIMIT : FILE_LIMIT)) { notify(isZip ? 'ZIP 文件不能超过 50 MB。' : '文件不能超过 10 MB。'); return }
   const token = ++previewToken.value
   file.value = candidate; preview.value = null; uploading.value = true; uploadCorpus.value = selected.value
+  zipEntries.value = null; zipSkipped.value = []; uploadError.value = ''; uploadProgress.value = ''
+  if (isZip) {
+    uploadProgress.value = '正在解压 ZIP…'
+    try {
+      const archive = await readZip(candidate)
+      if (token !== previewToken.value) return
+      zipEntries.value = archive.files; zipSkipped.value = archive.skipped
+      await previewZip(token)
+    } catch (e) { if (token === previewToken.value) { uploadError.value = e.message; uploadProgress.value = '' } }
+    finally { uploading.value = false }
+    return
+  }
   const form = new FormData(); form.append('file', candidate)
   try {
     const data = await api(`/corpora/${uploadCorpus.value}/preview`, { method: 'POST', body: form })
     if (token === previewToken.value) preview.value = data
-  } catch (e) { notify(e.message); file.value = null }
+  } catch (e) { if (token === previewToken.value) { uploadError.value = e.message; file.value = null } }
   finally { uploading.value = false }
 }
+async function previewZip(token = previewToken.value) {
+  uploading.value = true; uploadError.value = ''
+  const id = uploadCorpus.value
+  const entries = chosenZipEntries.value.filter(entry => !entry.preview && entry.status !== 'done')
+  try {
+    for (let i = 0; i < entries.length; i++) {
+      if (token !== previewToken.value) return
+      const entry = entries[i]
+      uploadProgress.value = `正在预览 ${i + 1}/${entries.length}：${entry.name}`
+      const form = new FormData(); form.append('file', entry.file)
+      try {
+        entry.preview = await api(`/corpora/${id}/preview`, { method: 'POST', body: form })
+        entry.error = ''
+      } catch (e) { entry.error = e.message }
+    }
+  } finally {
+    if (token === previewToken.value) { uploadProgress.value = ''; uploading.value = false }
+  }
+}
+async function uploadZip() {
+  if (!zipCanImport.value || uploading.value || uploadCorpus.value !== selected.value) return
+  const token = previewToken.value, id = uploadCorpus.value
+  const entries = chosenZipEntries.value.filter(entry => entry.status !== 'done')
+  uploading.value = true; uploadError.value = ''
+  let failures = 0
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i]
+    if (token !== previewToken.value) break
+    uploadProgress.value = `正在导入 ${i + 1}/${entries.length}：${entry.name}`
+    const form = new FormData(); form.append('file', entry.file)
+    try {
+      const result = await api(`/corpora/${id}/resources`, { method: 'POST', body: form })
+      entry.status = 'done'; entry.duplicate = result.duplicate; entry.importError = ''
+    } catch (e) { entry.status = 'failed'; entry.importError = e.message; failures++ }
+  }
+  if (token === previewToken.value) {
+    uploadProgress.value = ''
+    uploadError.value = failures ? `${failures} 个文件导入失败，已成功的文件已保留。点击“重试未完成文件”即可继续。` : ''
+    if (!failures) notify('所选文件已全部加入语料库。')
+  }
+  uploading.value = false
+  await refresh()
+}
 async function upload() {
-  if (!file.value || uploadCorpus.value !== selected.value) return
+  if (!file.value || uploading.value || uploadCorpus.value !== selected.value) return
   uploading.value = true
   const form = new FormData(); form.append('file', file.value)
   try {
@@ -118,10 +185,12 @@ async function archive() {
   catch (e) { notify(e.message) }
 }
 function chooseCorpus(id) {
+  if (uploading.value) { notify('请等待当前文件处理完成后再切换语料库。'); return }
   selectorOpen.value = false
   if (selected.value !== id) { selected.value = id; changeCorpus() }
 }
 function openCorpusMenu(event, item) {
+  if (uploading.value) return
   const rect = event.currentTarget.getBoundingClientRect()
   corpusMenu.value = { item, x: Math.max(8, Math.min(event.clientX || rect.left, window.innerWidth - 190)),
     y: Math.max(8, Math.min(event.clientY || rect.bottom, window.innerHeight - 64)) }
@@ -175,7 +244,7 @@ function nativeBack() {
   else if (page.value === 'library') page.value = 'search'
   else window.BibleTalkingNative?.close()
 }
-onMounted(() => { refresh(); timer = setInterval(refresh, 5000); document.addEventListener('pointerdown', closeMenus); document.addEventListener('keydown', escapeMenus); window.addEventListener('bible-back', nativeBack) })
+onMounted(() => { if (!isNative()) api('/health').then(data => { serverMode.value = data.deployment === 'server' }).catch(() => {}); refresh(); timer = setInterval(refresh, 5000); document.addEventListener('pointerdown', closeMenus); document.addEventListener('keydown', escapeMenus); window.addEventListener('bible-back', nativeBack) })
 onUnmounted(() => { clearInterval(timer); clearTimeout(toastTimer); document.removeEventListener('pointerdown', closeMenus); document.removeEventListener('keydown', escapeMenus); window.removeEventListener('bible-back', nativeBack) })
 </script>
 
@@ -184,7 +253,7 @@ onUnmounted(() => { clearInterval(timer); clearTimeout(toastTimer); document.rem
     <header class="site-header">
       <button v-if="page === 'library'" class="secondary back-button" @click="page = 'search'"><ArrowLeft :size="16" />返回</button>
       <span v-else class="header-note">旧时的文字，今日的表达<span class="tiny-spark">✦</span></span>
-      <button v-if="page === 'search'" class="secondary library-button" @click="page = 'library'; refresh()"><Library :size="16" />我的语料库</button>
+      <button v-if="page === 'search'" class="secondary library-button" @click="page = 'library'; refresh()"><Library :size="16" />{{ libraryLabel }}</button>
     </header>
 
     <main>
@@ -233,12 +302,28 @@ onUnmounted(() => { clearInterval(timer); clearTimeout(toastTimer); document.rem
       </template>
 
       <template v-else>
-        <section class="library-intro"><h1><span class="serif emphasis">我的语料库</span></h1><button class="primary" @click="modal = true"><Plus :size="17" />新建语料库</button></section>
+        <section class="library-intro"><h1><span class="serif emphasis">{{ libraryLabel }}</span></h1><button class="primary" :disabled="uploading" @click="modal = true"><Plus :size="17" />新建语料库</button></section>
+        <p v-if="serverMode" class="shared-library-note">这里的语料由所有访客共同使用，上传和管理操作会同步到共享语料库。</p>
         <div v-if="error" class="notice error" role="alert">{{ error }}</div>
         <div class="corpus-tabs"><div v-for="item in corpora" :key="item.corpus_id" class="corpus-card"><button class="corpus-tab" :class="{ selected: selected === item.corpus_id }" @click="chooseCorpus(item.corpus_id)" @contextmenu.prevent="openCorpusMenu($event, item)" @keydown.shift.f10.prevent="openCorpusMenu($event, item)" title="点击选择，右键删除语料库"><BookOpen :size="18" /><strong>{{ item.name }}</strong><span v-if="item.builtin" class="builtin">预置</span><small>{{ item.fragment_count.toLocaleString() }} 条原文</small></button><button class="corpus-more icon-button" :aria-label="`${item.name}的更多操作`" title="语料库操作" @click.stop="openCorpusMenu($event, item)"><MoreHorizontal :size="18" /></button></div></div>
         <template v-if="corpus">
           <div class="library-details"><div><h2>{{ corpus.name }}</h2></div></div>
-          <div class="upload-zone" :class="{ dragging: drag }" @dragover.prevent="drag = true" @dragleave.prevent="drag = false" @drop.prevent="drag = false; selectFile($event.dataTransfer.files[0])"><div class="upload-icon"><Upload :size="22" /></div><h3>上传定制语料</h3><button class="secondary" :disabled="uploading" @click="fileInput.click()"><LoaderCircle v-if="uploading" class="spin" :size="15" /><Plus v-else :size="15" />{{ uploading ? '正在处理' : '选择文件' }}</button><small>TXT、Markdown、JSON、JSONL · UTF-8 · 单个文件不超过 10 MB</small><input ref="fileInput" class="sr-only" type="file" accept=".txt,.md,.json,.jsonl" @change="selectFile($event.target.files[0])" /></div>
+          <div class="upload-zone" :class="{ dragging: drag }" @dragover.prevent="drag = true" @dragleave.prevent="drag = false" @drop.prevent="drag = false; selectFile($event.dataTransfer.files[0])"><div class="upload-icon"><Upload :size="22" /></div><h3>上传定制语料</h3><button class="secondary" :disabled="uploading" @click="fileInput.click()"><LoaderCircle v-if="uploading" class="spin" :size="15" /><Plus v-else :size="15" />{{ uploading ? '正在处理' : '选择文件或 ZIP' }}</button><small>TXT、Markdown、JSON、JSONL · UTF-8 · 单文件 10 MB / ZIP 50 MB</small><input ref="fileInput" class="sr-only" type="file" accept=".txt,.md,.json,.jsonl,.zip" @change="selectFile($event.target.files[0])" /></div>
+          <p v-if="uploadProgress" class="upload-progress" role="status"><LoaderCircle class="spin" :size="15" />{{ uploadProgress }}</p>
+          <p v-if="uploadError" class="notice error" role="alert">{{ uploadError }}</p>
+          <section v-if="zipEntries" class="preview-panel zip-preview" aria-label="ZIP 批量导入预览">
+            <div class="preview-heading"><div><strong>{{ file?.name }}</strong><p>已选 {{ chosenZipEntries.length }} / {{ zipEntries.length }} 个文件 · {{ zipCount.toLocaleString() }} 条原文</p></div><button class="primary" :disabled="uploading || !zipCanImport" @click="uploadZip">{{ uploading ? '正在处理…' : chosenZipEntries.some(entry => entry.status === 'failed') ? '重试未完成文件' : chosenZipEntries.length && chosenZipEntries.every(entry => entry.status === 'done') ? '导入完成' : '确认批量导入' }}<ArrowRight :size="15" /></button></div>
+            <p class="zip-help">说明文档和 metadata 默认不选，可按需勾选。每个文件将单独收录，已导入的相同文件会自动识别。</p>
+            <div class="zip-files">
+              <div v-for="entry in zipEntries" :key="entry.name" class="zip-file">
+                <label><input v-model="entry.selected" type="checkbox" :disabled="uploading || entry.status === 'done'" @change="previewZip()" /><span>{{ entry.name }}<small>{{ (entry.file.size / 1024).toFixed(0) }} KB<span v-if="entry.preview"> · {{ entry.preview.count.toLocaleString() }} 条原文</span><span v-if="entry.status === 'done'"> · {{ entry.duplicate ? '已在库中' : '已加入，索引进度见下方' }}</span></small></span></label>
+                <p v-if="entry.selected && (entry.error || entry.importError)" class="resource-error" role="alert">{{ entry.error || entry.importError }}</p>
+                <details v-if="entry.selected && entry.preview"><summary>查看切分预览</summary><div v-for="(part, i) in entry.preview.preview" :key="i" class="preview-row"><span>{{ i + 1 }}</span><div><p>{{ part.text }}</p><small>{{ part.citation.label }}</small></div></div></details>
+              </div>
+            </div>
+            <button v-if="chosenZipEntries.some(entry => entry.error)" class="secondary" :disabled="uploading" @click="previewZip()">重新预览失败文件</button>
+            <details v-if="zipSkipped.length" class="zip-skipped"><summary>已忽略 {{ zipSkipped.length }} 个隐藏文件或不支持的文件</summary><p v-for="item in zipSkipped" :key="item">{{ item }}</p></details>
+          </section>
           <div v-if="preview" class="preview-panel"><div class="preview-heading"><div><strong>{{ file?.name }}</strong><p>将切分为 {{ preview.count }} 条原文，预览前 {{ preview.preview.length }} 条。</p></div><button class="primary" :disabled="uploading" @click="upload">{{ uploading ? '正在导入…' : '确认导入' }}<ArrowRight :size="15" /></button></div><div v-for="(part, i) in preview.preview" :key="i" class="preview-row"><span>{{ i + 1 }}</span><div><p>{{ part.text }}</p><small>{{ part.citation.label }}</small></div></div></div>
           <button class="resource-heading resource-disclosure" :aria-expanded="resourcesOpen" aria-controls="resource-list" :title="resourcesOpen ? '收起收录的文字' : '展开收录的文字'" @click="resourcesOpen = !resourcesOpen"><span>收录的文字 <small>{{ resources.length }}</small></span><ChevronUp v-if="resourcesOpen" :size="18" /><ChevronDown v-else :size="18" /></button>
           <div v-if="resourcesOpen" id="resource-list">

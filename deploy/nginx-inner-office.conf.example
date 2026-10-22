@@ -1,0 +1,18 @@
+# Add both locations INSIDE the existing HTTPS server block for the-inner-office.me.
+# Keep existing server_name, certificates and the main site's other locations.
+location = /Bible_talking {
+    return 308 /Bible_talking/$is_args$args;
+}
+
+location ^~ /Bible_talking/ {
+    # The trailing slash strips /Bible_talking/ before forwarding to FastAPI.
+    proxy_pass http://127.0.0.1:18080/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_read_timeout 120s;
+    client_max_body_size 12m;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy same-origin always;
+}

@@ -1,6 +1,8 @@
 .venv/
+venv/
 __pycache__/
 .pytest_cache/
+.obsidian/
 node_modules/
 data/
 .env

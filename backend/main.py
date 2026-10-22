@@ -24,6 +24,7 @@ class SearchRequest(BaseModel):
 
 def create_app(settings=None, embedder=None):
     settings = settings or Settings()
+    settings.validate()
     @asynccontextmanager
     async def lifespan(app):
         library = Library(settings, embedder)
@@ -38,14 +39,23 @@ def create_app(settings=None, embedder=None):
     app = FastAPI(title='Bible_talking · 语料检索', lifespan=lifespan)
 
     @app.middleware('http')
-    async def local_origin(request: Request, call_next):
-        # Single-user localhost application. Do not expose without an auth adapter.
+    async def check_origin(request: Request, call_next):
+        is_api = request.url.path == '/api' or request.url.path.startswith('/api/')
         origin = request.headers.get('origin')
-        if request.url.path.startswith('/api') and origin:
+        if is_api and settings.deployment == 'server':
+            if origin and origin != settings.public_origin:
+                return JSONResponse({'detail': '不允许此来源访问语料库。'}, status_code=403)
+            if request.method not in {'GET', 'HEAD', 'OPTIONS'} and request.headers.get('x-bible-request') != '1':
+                return JSONResponse({'detail': '请求来源验证失败，请刷新页面。'}, status_code=403)
+        elif is_api and origin:
             from urllib.parse import urlparse
             if urlparse(origin).netloc != request.headers.get('host') and origin not in {'http://127.0.0.1:5173', 'http://localhost:5173'}:
                 return JSONResponse({'detail': '不允许此来源访问本地语料库。'}, status_code=403)
-        return await call_next(request)
+        response = await call_next(request)
+        if is_api:
+            response.headers['Cache-Control'] = 'no-store'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        return response
 
     @app.exception_handler(LookupError)
     async def missing(_, exc):
@@ -61,7 +71,7 @@ def create_app(settings=None, embedder=None):
     @app.get('/api/health')
     def health():
         return {'status': 'ok', 'vector_store': 'qdrant-server' if settings.qdrant_url else 'qdrant-local',
-            'embedding_model': settings.embedding_model}
+            'embedding_model': settings.embedding_model, 'deployment': settings.deployment}
 
     @app.get('/api/corpora')
     def corpora():

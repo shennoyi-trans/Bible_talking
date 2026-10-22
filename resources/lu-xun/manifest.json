@@ -1,0 +1,366 @@
+{
+  "created_date": "2026-10-22",
+  "source_url": "https://raw.githubusercontent.com/dooshu/shu/main/cn/116.txt",
+  "source_index": "https://doosho.com/cn/116",
+  "source_cache": "data\\luxun-research\\doosho-complete.txt",
+  "source_sha256": "858c65a672efe8c1ef42662a152c31949dd5deeca8e0eecf95e487b3202f8460",
+  "source_bytes": 15495990,
+  "source_characters": 5824268,
+  "toc_entries": 2916,
+  "retained_text_units": 2523,
+  "records": 41832,
+  "characters": 2887007,
+  "file_grouping": "original_collection",
+  "files": [
+    {
+      "file": "坟.jsonl",
+      "collection": "坟",
+      "source_volumes": [
+        1
+      ],
+      "records": 534,
+      "characters": 112521,
+      "bytes": 596271,
+      "sha256": "adb55ec2e9b48f85a3436bfada49d72b95a7bb48e19fc2e15cbed357c8ce453a"
+    },
+    {
+      "file": "热风.jsonl",
+      "collection": "热风",
+      "source_volumes": [
+        1
+      ],
+      "records": 430,
+      "characters": 34072,
+      "bytes": 328716,
+      "sha256": "4cf501adcd633dc59c36b6f561aa0e743c2d191936a8fa5518cb5757074cd3b4"
+    },
+    {
+      "file": "呐喊.jsonl",
+      "collection": "呐喊",
+      "source_volumes": [
+        1
+      ],
+      "records": 991,
+      "characters": 69513,
+      "bytes": 673026,
+      "sha256": "d8fe8e49f0ba35e9dda4c6bd0fc9d93790dd1c73d74d1b77444f0798054531f8"
+    },
+    {
+      "file": "彷徨.jsonl",
+      "collection": "彷徨",
+      "source_volumes": [
+        2
+      ],
+      "records": 1028,
+      "characters": 71348,
+      "bytes": 695924,
+      "sha256": "1f6588241eff004e879d7af233e2bcbf7ee4934d2cc917b807b83d00ddf4b93b"
+    },
+    {
+      "file": "野草.jsonl",
+      "collection": "野草",
+      "source_volumes": [
+        2
+      ],
+      "records": 451,
+      "characters": 19335,
+      "bytes": 272584,
+      "sha256": "2e3b506108ddecb0b35c8889e044458d3d1ce7b50e7cbca4e95c43754c99335f"
+    },
+    {
+      "file": "朝花夕拾.jsonl",
+      "collection": "朝花夕拾",
+      "source_volumes": [
+        2
+      ],
+      "records": 373,
+      "characters": 40648,
+      "bytes": 307205,
+      "sha256": "80cbb5439d727ef1bae1d075a6d8c2cad4d4052b585b5199e8a921324ac446f0"
+    },
+    {
+      "file": "故事新编.jsonl",
+      "collection": "故事新编",
+      "source_volumes": [
+        2
+      ],
+      "records": 988,
+      "characters": 55124,
+      "bytes": 639762,
+      "sha256": "64d0316951265a42ca45730f13fcf3eada7fb1098998c3e0e7ea583f78d99b59"
+    },
+    {
+      "file": "华盖集.jsonl",
+      "collection": "华盖集",
+      "source_volumes": [
+        3
+      ],
+      "records": 552,
+      "characters": 57778,
+      "bytes": 474013,
+      "sha256": "081f4e14d0ac8ce9b0590e4a8a7d6e7dfd12cc9c3655247f817979227a90e79e"
+    },
+    {
+      "file": "华盖集续编.jsonl",
+      "collection": "华盖集续编",
+      "source_volumes": [
+        3
+      ],
+      "records": 668,
+      "characters": 74679,
+      "bytes": 599788,
+      "sha256": "411bd41aa31c67d4b393da3e515720f36328eecf1fa82e459abe0a92e0f72c4b"
+    },
+    {
+      "file": "而已集.jsonl",
+      "collection": "而已集",
+      "source_volumes": [
+        3
+      ],
+      "records": 641,
+      "characters": 60109,
+      "bytes": 523438,
+      "sha256": "5f7ecec7117f3e190a1ec8a673c16b7a1fd7f4058fd2a2f1eac9ac6cf2aa593e"
+    },
+    {
+      "file": "三闲集.jsonl",
+      "collection": "三闲集",
+      "source_volumes": [
+        4
+      ],
+      "records": 568,
+      "characters": 61290,
+      "bytes": 493108,
+      "sha256": "557b8f72d21f4b13c57d3361a5d6bff3a587ff5998d22c904d0eeabb8b65b1ed"
+    },
+    {
+      "file": "二心集.jsonl",
+      "collection": "二心集",
+      "source_volumes": [
+        4
+      ],
+      "records": 702,
+      "characters": 84682,
+      "bytes": 655076,
+      "sha256": "8ce4be81772dc0bb841329dcbab3f9d05928e1c1bd5c2ca01819c12be758557d"
+    },
+    {
+      "file": "南腔北调集.jsonl",
+      "collection": "南腔北调集",
+      "source_volumes": [
+        4
+      ],
+      "records": 669,
+      "characters": 74923,
+      "bytes": 606776,
+      "sha256": "35bfae880c15d46784bb9e73e7e498c8da18344d719d7e7afe59afeaeaa64255"
+    },
+    {
+      "file": "伪自由书.jsonl",
+      "collection": "伪自由书",
+      "source_volumes": [
+        5
+      ],
+      "records": 718,
+      "characters": 59568,
+      "bytes": 565430,
+      "sha256": "6162834e2ceaa541ef50d7bc9a87566cc64ddbcaf45d7a2ff488082208093aca"
+    },
+    {
+      "file": "准风月谈.jsonl",
+      "collection": "准风月谈",
+      "source_volumes": [
+        5
+      ],
+      "records": 876,
+      "characters": 72221,
+      "bytes": 689440,
+      "sha256": "c9e551516b2559bfc81c95dde63d30f3975c5213df37858401d054e6d2a49add"
+    },
+    {
+      "file": "花边文学.jsonl",
+      "collection": "花边文学",
+      "source_volumes": [
+        5
+      ],
+      "records": 562,
+      "characters": 48115,
+      "bytes": 453042,
+      "sha256": "e3df5c6feab166681abb4463b8569870240e58423b5d16eb8b46818cefc66d1c"
+    },
+    {
+      "file": "且介亭杂文.jsonl",
+      "collection": "且介亭杂文",
+      "source_volumes": [
+        6
+      ],
+      "records": 582,
+      "characters": 74029,
+      "bytes": 548670,
+      "sha256": "2c02cc039dd0ee2d7634a44ce3541c210d07b53061131e95007f66ec7d6e6743"
+    },
+    {
+      "file": "且介亭杂文二集.jsonl",
+      "collection": "且介亭杂文二集",
+      "source_volumes": [
+        6
+      ],
+      "records": 601,
+      "characters": 86460,
+      "bytes": 620239,
+      "sha256": "a94e566d3aaeff7431aa6062c025adcdc25afb59e6c65b5d014448d600aab100"
+    },
+    {
+      "file": "且介亭杂文末编.jsonl",
+      "collection": "且介亭杂文末编",
+      "source_volumes": [
+        6
+      ],
+      "records": 500,
+      "characters": 60540,
+      "bytes": 472454,
+      "sha256": "70e9a237c3ec895f455a09474de6c877f65bfe57a81ca97eb47e025d8084d59a"
+    },
+    {
+      "file": "集外集.jsonl",
+      "collection": "集外集",
+      "source_volumes": [
+        7
+      ],
+      "records": 694,
+      "characters": 66042,
+      "bytes": 576975,
+      "sha256": "596ebcd41b33c20b746789993e08686aef6902f1139c803d394edc5e199def44"
+    },
+    {
+      "file": "集外集拾遗.jsonl",
+      "collection": "集外集拾遗",
+      "source_volumes": [
+        7
+      ],
+      "records": 832,
+      "characters": 75585,
+      "bytes": 696817,
+      "sha256": "86e1585598415e46f51fc7f8032550b0b535a2576e9d5b1d7b721f7b31135c39"
+    },
+    {
+      "file": "集外集拾遗补编.jsonl",
+      "collection": "集外集拾遗补编",
+      "source_volumes": [
+        8
+      ],
+      "records": 1966,
+      "characters": 139543,
+      "bytes": 1576833,
+      "sha256": "13fddc8beef3b0a9791e42aed5d6c42785215912a6676ee121f5139f0afa3790"
+    },
+    {
+      "file": "中国小说史略.jsonl",
+      "collection": "中国小说史略",
+      "source_volumes": [
+        9
+      ],
+      "records": 644,
+      "characters": 126890,
+      "bytes": 762402,
+      "sha256": "70a6dcc02bfb5e00872348a347c371faea6d60e7f03a0bdbecef2a282e7d78f2"
+    },
+    {
+      "file": "中国小说的历史的变迁.jsonl",
+      "collection": "中国小说的历史的变迁",
+      "source_volumes": [
+        9
+      ],
+      "records": 74,
+      "characters": 21224,
+      "bytes": 110019,
+      "sha256": "d3d5bfe86d6a23d9a490560edcaaef878784bd0768eb3f30b67f706140abc78b"
+    },
+    {
+      "file": "汉文学史纲要.jsonl",
+      "collection": "汉文学史纲要",
+      "source_volumes": [
+        9
+      ],
+      "records": 207,
+      "characters": 26115,
+      "bytes": 193702,
+      "sha256": "5a538dbdebccb250003387829a0da2242a5bd82b53013a415d03127f6db1c6e2"
+    },
+    {
+      "file": "古籍序跋集.jsonl",
+      "collection": "古籍序跋集",
+      "source_volumes": [
+        10
+      ],
+      "records": 268,
+      "characters": 39324,
+      "bytes": 265806,
+      "sha256": "f5f640c5dcb7dcd57c959bf6815f0d59369a5849eff74efc672d48fee36f79a3"
+    },
+    {
+      "file": "译文序跋集.jsonl",
+      "collection": "译文序跋集",
+      "source_volumes": [
+        10
+      ],
+      "records": 922,
+      "characters": 100428,
+      "bytes": 779414,
+      "sha256": "9ce1fbe5c808ec79f2b3a9e3d37ac5f43d15f4a54efb03bca75bd583f430dd29"
+    },
+    {
+      "file": "两地书.jsonl",
+      "collection": "两地书",
+      "source_volumes": [
+        11
+      ],
+      "records": 683,
+      "characters": 73212,
+      "bytes": 586601,
+      "sha256": "a47b3952a109a75cf6ef22b5178ebae8fd558b6c39c4410b29994fd9e652a475"
+    },
+    {
+      "file": "书信（1904—1936）.jsonl",
+      "collection": "书信",
+      "source_volumes": [
+        11,
+        12,
+        13,
+        14
+      ],
+      "records": 10174,
+      "characters": 494386,
+      "bytes": 7041704,
+      "sha256": "0ea334a4195a6b0087f1f5379e850ddcdd4b3482072bfd11f1aa20bc9a4efe1b"
+    },
+    {
+      "file": "鲁迅日记（1912—1936）.jsonl",
+      "collection": "鲁迅日记",
+      "source_volumes": [
+        15,
+        16
+      ],
+      "records": 12934,
+      "characters": 507303,
+      "bytes": 7931464,
+      "sha256": "5b9b7ee4211abcaa92492f17f05bd9074329df8136cc6036e527f62138c7bf40"
+    }
+  ],
+  "excluded_entries": 323,
+  "duplicate_units": 0,
+  "transformations": [
+    "依据原文件目录顺序定位全部条目",
+    "去除现代导言、注释、脚注锚点",
+    "段首尾去空白，保留原段落和措辞，不繁简转换、不补写、不润色",
+    "按文集/篇目/段落保留出处；卷8补充集名",
+    "完全相同的文本单元去重；内容相近的不同版本不强制合并"
+  ],
+  "limitations": [
+    "网络转录版，非出版社认证数字底本，未与纸本逐字校勘",
+    "篇目含角色对白及他人引文，不应将每段视为鲁迅本人观点",
+    "排除外国人士书信和第14卷附录等待核材料；译文集、辑录古籍和科学著作尚未纳入",
+    "1922年日记仅存世断片；统计为文本单元和段落数，不是独立作品篇数",
+    "原作、现代注释、译文和网站内容许可分别处理，不能把全套现代版标作无条件公版"
+  ]
+}

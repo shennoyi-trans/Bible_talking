@@ -4,14 +4,14 @@
 
 Bible_talking 是一个以本地语义检索为核心的语料工具，预置简体《和合本》圣经，也支持导入自己的文本。它从已有语料中返回原文片段，方便查看出处、阅读上下文和复制引用；目前不生成或改写经文。
 
-支持浏览器本地运行、Windows 便携版和 Android 离线版。模型在本机执行，无需配置云端模型 API Key。
+支持开放网页版、浏览器本地运行、Windows 便携版和 Android 离线版。网页版模型在服务器执行，离线版在本机执行，无需配置云端模型 API Key。
 
 ## 主要功能
 
 - **语义检索**：使用中文 BGE-small-zh-v1.5 模型理解查询，默认返回最多 50 个不同原文片段，可切换为 20 或 100 条。
 - **原文与出处**：显示原文、出处和译本，支持复制“原文＋出处”或“仅原文”，并展开前后文；节内摘录标注为“节选”。
 - **内置圣经**：预置简体《和合本》66 卷、31,100 节，保留本数据源的实际措辞、书名及章节，不补写缺失经节。
-- **自定义语料**：支持 UTF-8 编码的 TXT、Markdown、JSON、JSONL，提供切分预览、后台索引、进度和失败重试。
+- **自定义语料**：支持 UTF-8 编码的 TXT、Markdown、JSON、JSONL，也可上传 ZIP 批量导入，提供切分预览、后台索引、进度和失败重试。
 - **语料管理**：支持创建语料库、移除资源、删除与恢复语料库；新索引完整建立后才替换旧索引。
 - **本地保存**：Windows 与浏览器后端使用 SQLite 和 Qdrant；Android 使用 IndexedDB 和本地向量检索。
 
@@ -21,9 +21,10 @@ Bible_talking 是一个以本地语义检索为核心的语料工具，预置简
 
 | 方式 | 运行要求 | 数据位置 |
 | --- | --- | --- |
+| 开放网页版 | Linux 服务器、现有 Nginx；Docker Compose 或 Python 服务 | 服务器持久化数据目录，所有访客共享 |
 | Windows 便携版 | Windows 10/11 x64、Microsoft Edge WebView2 Runtime | 程序目录中的 `data/` |
 | Android 离线版 | Android 8.0+、ARM64、系统 WebView 95+ | 应用内部存储 |
-| 源码运行 | Python 3.11–3.13、Node.js 22；以下命令使用 Windows PowerShell | 默认项目目录中的 `data/` |
+| 源码运行 | Python 3.12/3.13、Node.js 22；以下命令使用 Windows PowerShell | 默认项目目录中的 `data/` |
 
 Windows 和 Android 离线包均包含模型、圣经正文与预置索引，不需要安装 Python、Node.js 或 Docker。手机与电脑的语料独立保存，目前没有自动同步。
 
@@ -96,7 +97,15 @@ npm --prefix frontend run build
 
 请先停止占用同一数据目录或端口的旧进程，再打开 [构建后的页面](http://127.0.0.1:8000/)。也可由静态服务托管 `frontend/dist/`，并将 `/api` 代理到后端。
 
-**当前面向单用户本机使用。** 内部所有者暂为 `1`，尚未实现用户认证、多租户权限或 Metalks 数据互通；对外部署前需要补齐认证与资源授权。
+### 开放网页版（自有服务器 + Nginx）
+
+网页版按公开共享模式运行，不需要登录，所有访客均可搜索、上传和管理同一套语料。前端构建后由后端直接托管，已有 Nginx 代理到本机后端端口即可。
+
+已提供 `compose.server.yaml`、`Dockerfile`、Nginx 配置及可选 systemd 服务。完整步骤、数据备份和验证边界见 [服务器部署说明](docs/server-deployment.md)。可运行 `scripts/package_server.py` 将已构建网页与后端打包到 `release/`。
+
+安装到 `/opt/Bible_talking`，通过 `https://the-inner-office.me/Bible_talking/` 访问时，请使用 [专用 Python + systemd 部署流程](docs/inner-office-deployment.md)。新版网页已支持子路径，配置保留现有主站路由。
+
+内部所有者仍为 `1`；当前没有私人语料隔离或 Metalks 数据互通。
 
 ## 配置与存储
 
@@ -107,6 +116,8 @@ npm --prefix frontend run build
 | `QDRANT_URL` | 空 | 留空使用持久化本地模式，设置后连接独立 Qdrant 服务 |
 | `PRELOAD_BIBLE` | `1` | 设为 `0` 可禁用启动时自动导入内置圣经，适用于独立测试库 |
 | `HF_HUB_OFFLINE` | 未设置 | 模型已缓存后设为 `1`，启用离线模式 |
+| `DEPLOYMENT_MODE` | `local` | `server` 启用公开共享网页版与域名来源检查 |
+| `PUBLIC_ORIGIN` | 空 | 服务器模式的完整网站来源，如 `https://bible.example.com` |
 | `BIBLE_TALKING_DATA_DIR` | 由桌面启动器确定 | Windows 桌面版的数据目录覆盖项 |
 
 ### Qdrant 本地模式
@@ -135,6 +146,9 @@ $env:QDRANT_URL = 'http://127.0.0.1:6333'
 - **TXT / Markdown**：按文本内容切分，记录标题路径、段落号及字符位置。
 - **JSON**：使用对象数组。
 - **JSONL**：每行一个对象。
+- **ZIP**：在“选择文件或 ZIP”中直接上传压缩包，也可拖入上传区。支持上述四种格式和子目录；勾选文件、检查各文件的切分预览后，一次确认批量导入。说明文件（如 README、SOURCES）和 `metadata` 目录默认不选；隐藏文件和其他格式会忽略。单个文件失败不会撤销已成功的文件，可只重试未完成项。
+
+ZIP 在设备本地解压，再按文件提交至现有导入接口；网页版和离线前端共用此流程。压缩包最大 50 MiB，解压总量最大 100 MiB，最多 200 个文件或目录，包内每个文件最大 10 MiB。不支持加密包、ZIP64 或嵌套 ZIP。同一语料库中的同名、同内容文件沿用去重逻辑；不同目录出现同名文件时，会将目录加入资源名以便区分。导入页面显示的“导入完成”表示文件已提交，向量索引进度仍在下方资源列表中查看。
 
 JSON 示例：
 
@@ -169,6 +183,8 @@ New-Item -ItemType Directory -Force data\test-runs | Out-Null
 ```
 
 `--basetemp` 必须指向专用测试目录，pytest 会清理其中内容。后端测试使用独立临时数据库与确定性向量替身验证业务行为；真实模型检索质量需要另行验收。
+
+ZIP 解压校验测试：在 `frontend/` 运行 `node --test zip.test.mjs`。浏览器回归测试 `node zip-ui.test.mjs` 需要先用独立 `DATA_DIR` 启动本地预览，并设置 `MODEL_CACHE_DIR` 指向已有模型缓存；它会创建并归档测试语料库，勿连接正式数据库。默认使用本机 Edge，可通过 `PLAYWRIGHT_CHANNEL` 调整；通过 `ZIP_TEST_URL` 可切换到构建产物的访问地址。
 
 历史验证记录见 [第一阶段验收](docs/verification.md) 和 [Android 实现与验证](docs/android.md)。目前尚未完成独立标注集上的检索质量评测。
 

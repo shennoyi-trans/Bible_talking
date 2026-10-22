@@ -1,0 +1,15 @@
+**
+!Dockerfile
+!requirements-lock.txt
+!backend/
+!backend/*.py
+!resources/
+!resources/cuv.jsonl
+!resources/manifest.json
+!scripts/
+!scripts/warm_model.py
+!scripts/reindex_all.py
+!scripts/server_entrypoint.py
+!frontend/
+!frontend/dist/
+!frontend/dist/**
