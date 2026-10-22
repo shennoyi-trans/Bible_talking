@@ -1,0 +1,27 @@
+Bible_talking · Windows x64 全本地便携版
+
+使用方法
+1. 完整解压 ZIP 到有写入权限的文件夹，再双击 Bible_talking.exe。
+   请保留 _internal、models、data 文件夹和 portable.txt；不要只复制 EXE。
+2. 无需安装 Python、Node.js 或 Docker。需要 Windows 10/11 x64 和 Microsoft Edge WebView2 Runtime。
+   若缺少 WebView2，请从微软官方下载：
+   https://developer.microsoft.com/microsoft-edge/webview2/
+3. 离线包已包含中文向量模型、圣经正文和全部索引，可以断网检索。
+   首次启动需要载入索引，首次查询需要载入模型，请稍等。
+4. 自定义语料与索引保存在程序旁边的 data 文件夹；备份时一并复制整个文件夹。
+   发布包仅含内置圣经，不含开发项目的自定义语料。
+5. 更新时先退出程序，再替换 Bible_talking.exe 和 _internal 文件夹，保留现有 data、models 和 portable.txt。
+   不要把新版自带的初始 data 文件夹覆盖到自己的语料上。
+6. 关闭窗口会停止本地服务；同一数据目录只能同时启动一个实例。
+7. 本程序只监听本机随机端口，不提供手机或局域网远程访问。
+   移动端布局已适配，但此 EXE 不能安装在 Android 上。
+8. 程序未进行商业代码签名；发布目录 SHA256SUMS.txt 提供 ZIP 的校验值。
+
+排查
+- 启动或导入错误见 data/desktop.log。
+- 如果把程序放在只读目录，请先移动到个人文件夹再运行。
+- 离线字体使用系统宋体等回退字体，界面不依赖在线字体才能使用。
+- “我的语料库”卡片上的省略号菜单也能执行右键菜单的操作，适用于触屏。
+- 如需改变数据位置，可设置 BIBLE_TALKING_DATA_DIR；模型目录可通过 MODEL_CACHE_DIR 指定。
+
+打包与验证信息见发布目录中的 verification.json。

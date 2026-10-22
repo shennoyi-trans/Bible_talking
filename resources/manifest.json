@@ -1,0 +1,13 @@
+{
+  "name": "Chinese Union Version (Simplified)",
+  "edition_id": "cuv-simp-open-bibles",
+  "source_url": "https://github.com/seven1m/open-bibles/blob/master/chi-cuv-simp.usfx.xml",
+  "license_statement_url": "https://github.com/seven1m/open-bibles#translation-list",
+  "upstream_license": "Public Domain",
+  "source_sha256": "bea9f6e4fd35b70a67e3978ce8b9dc0ad853078e67472653cf1b34f357ae3abf",
+  "corpus_sha256": "ba0f1abaec5c4bea3bf83470ca0f46a2eadf417d4963cc88b5a44d5fe187523c",
+  "books": 66,
+  "verses": 31100,
+  "parser": "prepare_bible.py v1",
+  "notes": "Preserves the upstream wording and book names; counts follow this specific source, without filling missing verses."
+}
