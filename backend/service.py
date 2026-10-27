@@ -3,6 +3,7 @@ import json
 import logging
 import threading
 import uuid
+from itertools import islice
 from pathlib import Path
 
 from sqlalchemy import create_engine, event, func, select, update
@@ -23,6 +24,7 @@ def uid(prefix):
 
 class Library:
     def __init__(self, settings, embedder=None):
+        settings.validate()
         self.settings = settings
         settings.data_dir.mkdir(parents=True, exist_ok=True)
         self.engine = create_engine(f'sqlite:///{settings.data_dir / "library.sqlite3"}', connect_args={'check_same_thread': False, 'timeout': 30})
@@ -234,10 +236,11 @@ class Library:
                 return True
             job.status, job.error = 'processing', None
             job.attempts += 1
-            fragments = list(db.scalars(select(Fragment).where(Fragment.version_id == job.version_id).order_by(Fragment.fragment_index)))
         try:
             # Replayed batches are idempotent; a generation is invisible until committed.
-            for start in range(0, len(fragments), 64):
+            last_index, processed = -1, 0
+            batch_size = self.settings.embedding_batch_size
+            while True:
                 if self.stop.is_set():
                     with self.db.begin() as db:
                         db.get(IngestionJob, job.job_id).status = 'pending'
@@ -245,14 +248,29 @@ class Library:
                 with self.db() as db:
                     if db.get(Resource, job.resource_id).visibility != 'active':
                         raise ValueError('资源已归档，导入已停止。')
-                items = [(f, a, b) for f in fragments[start:start+64] for a, b in index_spans(f.text)]
-                embeddings = self.embedder.encode([f.text[a:b] for f, a, b in items])
-                points = [PointStruct(id=str(uuid.uuid5(uuid.NAMESPACE_URL, f'{job.job_id}:{f.fragment_id}:{a}:{b}')),
-                    vector=vector, payload={'generation': job.job_id, 'fragment_id': f.fragment_id,
-                    'start': a, 'end': b}) for (f, a, b), vector in zip(items, embeddings, strict=True)]
-                self.vectors.upsert(points)
+                    fragments = list(db.scalars(select(Fragment).where(Fragment.version_id == job.version_id,
+                        Fragment.fragment_index > last_index).order_by(Fragment.fragment_index).limit(batch_size)))
+                if not fragments:
+                    break
+                # Excerpts can multiply each fragment into many vectors. Bound those batches too.
+                spans = ((f, a, b) for f in fragments for a, b in index_spans(f.text))
+                while items := list(islice(spans, batch_size)):
+                    if self.stop.is_set():
+                        with self.db.begin() as db:
+                            db.get(IngestionJob, job.job_id).status = 'pending'
+                        return False
+                    embeddings = self.embedder.encode([f.text[a:b] for f, a, b in items])
+                    points = [PointStruct(id=str(uuid.uuid5(uuid.NAMESPACE_URL, f'{job.job_id}:{f.fragment_id}:{a}:{b}')),
+                        vector=vector, payload={'generation': job.job_id, 'fragment_id': f.fragment_id,
+                        'start': a, 'end': b}) for (f, a, b), vector in zip(items, embeddings, strict=True)]
+                    self.vectors.upsert(points)
+                    del embeddings, points
+                    self.stop.wait(self.settings.index_batch_pause)
+                last_index = fragments[-1].fragment_index
+                processed += len(fragments)
                 with self.db.begin() as db:
-                    db.get(IngestionJob, job.job_id).processed = min(start + 64, len(fragments))
+                    db.get(IngestionJob, job.job_id).processed = processed
+                del fragments
             with self.mutation, self.db.begin() as db:
                 resource = db.get(Resource, job.resource_id)
                 current = db.get(IngestionJob, job.job_id)
@@ -279,6 +297,8 @@ class Library:
                 try:
                     if self.process_one():
                         continue
+                    if hasattr(self.embedder, 'release_if_idle'):
+                        self.embedder.release_if_idle()
                 except Exception:
                     log.exception('Worker failed')
                 self.wakeup.wait(2)
@@ -342,4 +362,6 @@ class Library:
             if self.worker.is_alive():
                 return  # Process teardown will release handles after the in-flight batch.
         self.vectors.close()
+        if hasattr(self.embedder, 'close'):
+            self.embedder.close()
         self.engine.dispose()

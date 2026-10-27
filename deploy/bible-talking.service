@@ -13,6 +13,14 @@ Environment=DATA_DIR=/var/lib/bible-talking
 Environment=HF_HOME=/var/lib/bible-talking/huggingface
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=OMP_NUM_THREADS=1
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=MKL_NUM_THREADS=1
+Environment=TOKENIZERS_PARALLELISM=false
+Nice=10
+CPUWeight=10
+CPUQuota=50%
+IOWeight=10
 ExecStart=/opt/bible-talking/.venv/bin/python scripts/server_entrypoint.py
 Restart=on-failure
 RestartSec=10

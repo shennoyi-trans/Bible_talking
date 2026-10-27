@@ -6,6 +6,8 @@ services:
     image: bible-talking:local
     restart: unless-stopped
     init: true
+    cpus: 0.5
+    cpu_shares: 128
     environment:
       DEPLOYMENT_MODE: server
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Run scripts/configure_server.py first}
@@ -13,6 +15,10 @@ services:
       FORWARDED_ALLOW_IPS: "*"
       QDRANT_URL: http://qdrant:6333
       PRELOAD_BIBLE: "1"
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      TOKENIZERS_PARALLELISM: "false"
     volumes:
       - app_data:/app/data
     ports:

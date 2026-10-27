@@ -157,6 +157,33 @@ curl -f https://the-inner-office.me/Bible_talking/api/health
 
 备份时先停止服务，完整保存 `/var/lib/bible-talking/` 和 `/opt/Bible_talking/.env`，再启动服务；不要只备份程序目录。当前使用单进程和本地 Qdrant，完整预置语料会触发本地模式的大数据量提示，但不影响初次部署；后续可以独立评估迁移 Qdrant 服务，迁移时需重建索引。
 
+## 低资源更新
+
+更新 `backend/` 后重启即可启用：每批 8 条、单线程、关闭 ONNX CPU 内存池、闲置 60 秒卸载模型、每批索引暂停 0.1 秒。模型闲置后的首次搜索需要重新加载；现有语料和索引直接沿用。
+
+已有服务安装下面的 drop-in，可保留实际的 `venv` 路径、启动参数和数据目录，同时降低运行优先级，将整个应用限制到半个 CPU 核心。先用 `systemctl cat bible-talking` 确认这是当前应用服务，再在更新后的代码目录执行：
+
+```bash
+cd /opt/Bible_talking
+sudo install -d /etc/systemd/system/bible-talking.service.d
+sudo install -m 644 deploy/low-resource.conf /etc/systemd/system/bible-talking.service.d/low-resource.conf
+sudo systemctl daemon-reload
+sudo systemctl restart bible-talking
+curl -f http://127.0.0.1:18080/api/health
+```
+
+这里的 `CPUQuota=50%` 表示半个核心的总算力；`Nice=10`、`CPUWeight=10` 和 `IOWeight=10` 让繁忙时其他服务获得更高调度权重。数学库和分词器也使用节制并行的环境配置。要进一步减小推理峰值，可在现有 `.env` 中设置 `EMBEDDING_BATCH_SIZE=1`，然后重启。
+
+观察索引完成、搜索之后和闲置约 65 秒时的内存：
+
+```bash
+systemctl show bible-talking -p MainPID -p MemoryCurrent -p CPUQuotaPerSecUSec
+ps -p "$(systemctl show bible-talking -p MainPID --value)" -o pid,%cpu,%mem,rss,vsz,etime,args
+curl -s http://127.0.0.1:18080/api/corpora
+```
+
+`rss` 单位为 KiB；`pending_jobs` 为零表示当前索引队列处理完毕。本地 Qdrant 的向量和元数据仍在内存中，闲置卸载针对模型及推理缓冲。Linux/glibc 环境在卸载后还会尝试归还空闲堆内存。CPU 限额会降低搜索和索引速度。
+
 ## 服务器无法下载模型时：使用离线模型包
 
 日志出现 `Could not download model from HuggingFace: [Errno 101] Network is unreachable`，说明启动器已执行到模型准备阶段，但下载连接失败。无需重建 Python 环境，可以上传开发机已经缓存的模型。这个日志本身不能区分具体是路由、出口限制还是其他网络配置问题。

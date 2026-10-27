@@ -12,6 +12,7 @@ def main():
         raise SystemExit('Build first: npm --prefix frontend run build')
     files = [ROOT / name for name in ['Dockerfile', '.dockerignore', 'compose.server.yaml',
              'requirements-lock.txt', 'README.md', 'docs/server-deployment.md', 'docs/inner-office-deployment.md',
+             'docs/low-resource-verification.md', 'scripts/benchmark_embedding_memory.py',
              'resources/cuv.jsonl', 'resources/manifest.json',
              'scripts/warm_model.py', 'scripts/reindex_all.py',
              'scripts/configure_server.py', 'scripts/server_entrypoint.py']]

@@ -113,6 +113,10 @@ npm --prefix frontend run build
 | --- | --- | --- |
 | `DATA_DIR` | 项目目录下的 `data/` | 源码后端的数据目录 |
 | `MODEL_CACHE_DIR` | 数据目录下的 `models/` | 模型缓存目录 |
+| `EMBEDDING_BATCH_SIZE` | `8` | 每批推理文本数，同时限制索引读取片段和写入向量的批次 |
+| `EMBEDDING_THREADS` | `1` | 模型推理线程数 |
+| `EMBEDDING_IDLE_SECONDS` | `60` | 无推理活动达到此秒数后卸载模型，后台每约 2 秒检查一次 |
+| `INDEX_BATCH_PAUSE` | `0.1` | 后台每批写入向量后暂停的秒数，设为 `0` 可取消暂停 |
 | `QDRANT_URL` | 空 | 留空使用持久化本地模式，设置后连接独立 Qdrant 服务 |
 | `PRELOAD_BIBLE` | `1` | 设为 `0` 可禁用启动时自动导入内置圣经，适用于独立测试库 |
 | `HF_HUB_OFFLINE` | 未设置 | 模型已缓存后设为 `1`，启用离线模式 |
@@ -121,6 +125,10 @@ npm --prefix frontend run build
 | `BIBLE_TALKING_DATA_DIR` | 由桌面启动器确定 | Windows 桌面版的数据目录覆盖项 |
 
 ### Qdrant 本地模式
+
+程序默认优先节省资源：单线程、小批次推理，关闭 ONNX CPU 内存池，模型闲置一分钟后释放，下次搜索按需重新加载，因此闲置后的首次搜索会慢一些。索引按小批次从数据库读取，包含引语的段落也分批编码和写入。模型、向量维度及索引格式保持兼容，更新后沿用已有索引。
+
+systemd 模板默认降低 CPU/I/O 权重，并将应用 CPU 总使用量限制为半个核心（`CPUQuota=50%`）；已有服务器可按 [低资源更新步骤](docs/inner-office-deployment.md#低资源更新) 安装 drop-in，保留原有启动命令。Docker Compose 的应用容器也默认限制为半个核心。内存实际占用取决于语料规模，本地 Qdrant 的向量和元数据仍常驻内存。
 
 默认将向量保存在 `data/qdrant/`，无需 Docker。同一数据目录只能由一个应用进程打开，请勿启动多个 Uvicorn workers。完整预置语料已超过本地模式建议迁移到服务端的 20,000 点规模，大规模使用需评估独立服务。
 
