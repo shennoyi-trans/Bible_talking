@@ -27,6 +27,19 @@ class CorpusArchive(Base):
     created_at: Mapped[str] = mapped_column(default=now)
 
 
+class BuiltinExclusion(Base):
+    """Only a source identifier: prevent deleted bundled data from being reimported."""
+    __tablename__ = 'builtin_exclusions'
+    source_id: Mapped[str] = mapped_column(String, primary_key=True)
+
+
+class PendingDeletion(Base):
+    """Durable cleanup intent across SQLite, vector storage and original files."""
+    __tablename__ = 'pending_deletions'
+    target_id: Mapped[str] = mapped_column(String, primary_key=True)
+    kind: Mapped[str]
+
+
 class Resource(Base):
     __tablename__ = 'resources'
     resource_id: Mapped[str] = mapped_column(String, primary_key=True)

@@ -1,0 +1,212 @@
+[
+  {
+    "kind": "all",
+    "comparison": "semantic minus bm25_word",
+    "hit5_difference": 0.0375,
+    "hit5_ci95": [
+      -0.04583333333333333,
+      0.12083333333333333
+    ],
+    "mrr10_difference": -0.010286044973544973,
+    "mrr10_ci95": [
+      -0.07178538359788358,
+      0.051030175264550275
+    ]
+  },
+  {
+    "kind": "all",
+    "comparison": "hybrid minus semantic",
+    "hit5_difference": 0.06666666666666667,
+    "hit5_ci95": [
+      -0.004166666666666667,
+      0.14166666666666666
+    ],
+    "mrr10_difference": 0.07059854497354498,
+    "mrr10_ci95": [
+      0.015262731481481488,
+      0.12748557374338626
+    ]
+  },
+  {
+    "kind": "all",
+    "comparison": "bm25_bigram minus bm25_word",
+    "hit5_difference": -0.0375,
+    "hit5_ci95": [
+      -0.08333333333333333,
+      0.008333333333333333
+    ],
+    "mrr10_difference": -0.016605489417989415,
+    "mrr10_ci95": [
+      -0.05720738260582011,
+      0.021283358134920643
+    ]
+  },
+  {
+    "kind": "literal",
+    "comparison": "semantic minus bm25_word",
+    "hit5_difference": -0.4,
+    "hit5_ci95": [
+      -0.5166666666666667,
+      -0.2833333333333333
+    ],
+    "mrr10_difference": -0.4857010582010582,
+    "mrr10_ci95": [
+      -0.5904735449735451,
+      -0.3774322089947091
+    ]
+  },
+  {
+    "kind": "literal",
+    "comparison": "hybrid minus semantic",
+    "hit5_difference": 0.2833333333333333,
+    "hit5_ci95": [
+      0.18333333333333332,
+      0.4
+    ],
+    "mrr10_difference": 0.23667328042328042,
+    "mrr10_ci95": [
+      0.16500545634920638,
+      0.31273197751322745
+    ]
+  },
+  {
+    "kind": "literal",
+    "comparison": "bm25_bigram minus bm25_word",
+    "hit5_difference": 0.0,
+    "hit5_ci95": [
+      0.0,
+      0.0
+    ],
+    "mrr10_difference": 0.008333333333333333,
+    "mrr10_ci95": [
+      0.0,
+      0.025
+    ]
+  },
+  {
+    "kind": "keyword",
+    "comparison": "semantic minus bm25_word",
+    "hit5_difference": -0.05,
+    "hit5_ci95": [
+      -0.1,
+      0.0
+    ],
+    "mrr10_difference": -0.05873015873015873,
+    "mrr10_ci95": [
+      -0.12778769841269844,
+      0.0
+    ]
+  },
+  {
+    "kind": "keyword",
+    "comparison": "hybrid minus semantic",
+    "hit5_difference": 0.05,
+    "hit5_ci95": [
+      0.0,
+      0.1
+    ],
+    "mrr10_difference": 0.0503968253968254,
+    "mrr10_ci95": [
+      0.0,
+      0.10834325396825402
+    ]
+  },
+  {
+    "kind": "keyword",
+    "comparison": "bm25_bigram minus bm25_word",
+    "hit5_difference": -0.016666666666666666,
+    "hit5_ci95": [
+      -0.05,
+      0.0
+    ],
+    "mrr10_difference": -0.008333333333333333,
+    "mrr10_ci95": [
+      -0.03333333333333333,
+      0.016666666666666666
+    ]
+  },
+  {
+    "kind": "paraphrase",
+    "comparison": "semantic minus bm25_word",
+    "hit5_difference": 0.26666666666666666,
+    "hit5_ci95": [
+      0.11666666666666667,
+      0.4166666666666667
+    ],
+    "mrr10_difference": 0.25418650793650793,
+    "mrr10_ci95": [
+      0.14957390873015872,
+      0.36229546957671954
+    ]
+  },
+  {
+    "kind": "paraphrase",
+    "comparison": "hybrid minus semantic",
+    "hit5_difference": -0.06666666666666667,
+    "hit5_ci95": [
+      -0.21666666666666667,
+      0.08333333333333333
+    ],
+    "mrr10_difference": -0.013591269841269842,
+    "mrr10_ci95": [
+      -0.12769345238095237,
+      0.10565625000000002
+    ]
+  },
+  {
+    "kind": "paraphrase",
+    "comparison": "bm25_bigram minus bm25_word",
+    "hit5_difference": -0.11666666666666667,
+    "hit5_ci95": [
+      -0.21666666666666667,
+      -0.016666666666666666
+    ],
+    "mrr10_difference": -0.03900132275132274,
+    "mrr10_ci95": [
+      -0.11608531746031747,
+      0.03276669973544975
+    ]
+  },
+  {
+    "kind": "deletion",
+    "comparison": "semantic minus bm25_word",
+    "hit5_difference": 0.3333333333333333,
+    "hit5_ci95": [
+      0.18333333333333332,
+      0.48333333333333334
+    ],
+    "mrr10_difference": 0.24910052910052913,
+    "mrr10_ci95": [
+      0.13426669973544975,
+      0.36421990740740734
+    ]
+  },
+  {
+    "kind": "deletion",
+    "comparison": "hybrid minus semantic",
+    "hit5_difference": 0.0,
+    "hit5_ci95": [
+      -0.13333333333333333,
+      0.13333333333333333
+    ],
+    "mrr10_difference": 0.008915343915343914,
+    "mrr10_ci95": [
+      -0.09984639550264551,
+      0.11880059523809525
+    ]
+  },
+  {
+    "kind": "deletion",
+    "comparison": "bm25_bigram minus bm25_word",
+    "hit5_difference": -0.016666666666666666,
+    "hit5_ci95": [
+      -0.11666666666666667,
+      0.08333333333333333
+    ],
+    "mrr10_difference": -0.02742063492063492,
+    "mrr10_ci95": [
+      -0.1121132605820106,
+      0.05052149470899473
+    ]
+  }
+]

@@ -6,16 +6,20 @@ import uuid
 from itertools import islice
 from pathlib import Path
 
-from sqlalchemy import create_engine, event, func, select, update
+from sqlalchemy import create_engine, delete, event, func, select, update
 from sqlalchemy.orm import sessionmaker
 from qdrant_client.models import PointStruct
 
 from .config import ROOT
-from .models import Base, Corpus, CorpusArchive, CorpusResource, Fragment, IngestionJob, Resource, ResourceVersion
+from .models import Base, BuiltinExclusion, Corpus, CorpusArchive, CorpusResource, Fragment, IngestionJob, PendingDeletion, Resource, ResourceVersion
 from .parsers import index_spans, parse_records
 from .vectors import Embedder, VectorStore
 
 log = logging.getLogger(__name__)
+
+
+class DeletionPending(RuntimeError):
+    pass
 
 
 def uid(prefix):
@@ -51,7 +55,7 @@ class Library:
 
     def require_corpus(self, db, corpus_id):
         corpus = db.get(Corpus, corpus_id)
-        if not corpus or corpus.owner_user_id != 1 or db.get(CorpusArchive, corpus_id):
+        if not corpus or corpus.owner_user_id != 1 or db.get(CorpusArchive, corpus_id) or db.get(PendingDeletion, corpus_id):
             raise LookupError('语料库不存在。')
         return corpus
 
@@ -73,6 +77,8 @@ class Library:
             self.require_corpus(db, corpus_id)
             existing = db.get(Resource, resource_id)
             if existing:
+                if existing.visibility == 'deleting':
+                    raise ValueError('这份语料正在删除，请稍后重新上传。')
                 existing.visibility = 'active'
                 job = db.scalar(select(IngestionJob).where(IngestionJob.resource_id == resource_id).order_by(IngestionJob.created_at.desc()))
                 if not existing.active_generation and job.status in {'failed', 'cancelled'}:
@@ -108,7 +114,7 @@ class Library:
         corpus_id = 'corpus_cuv'
         with self.db() as db:
             exists = db.get(Corpus, corpus_id)
-            if db.get(CorpusArchive, corpus_id):
+            if db.get(CorpusArchive, corpus_id) or db.get(BuiltinExclusion, corpus_id) or db.get(PendingDeletion, corpus_id):
                 return
         if not exists:
             self.create_corpus('圣经 · 和合本', '简体中文和合本。按卷、章、节保留出处；支持查看上下文。', True, corpus_id)
@@ -122,6 +128,8 @@ class Library:
         ordered = [key for key in preferred if key in books] + [key for key in books if key not in preferred]
         for key in ordered:
             with self.db() as db:
+                if db.get(BuiltinExclusion, f'cuv:{key}'):
+                    continue
                 if db.scalar(select(Resource).where(Resource.source_type == 'builtin_bible', Resource.source_ref_id == f'cuv:{key}')):
                     continue
             records = books[key]
@@ -133,7 +141,8 @@ class Library:
         with self.db() as db:
             result = []
             for corpus in db.scalars(select(Corpus).where(Corpus.owner_user_id == 1,
-                    ~Corpus.corpus_id.in_(select(CorpusArchive.corpus_id))).order_by(Corpus.created_at)):
+                    ~Corpus.corpus_id.in_(select(CorpusArchive.corpus_id)),
+                    ~Corpus.corpus_id.in_(select(PendingDeletion.target_id))).order_by(Corpus.created_at)):
                 resources = self.resource_rows(db, corpus.corpus_id)
                 ids = [r.resource_id for r in resources]
                 count = db.scalar(select(func.count()).select_from(Fragment).where(Fragment.resource_id.in_(ids)))
@@ -148,28 +157,65 @@ class Library:
     def archived_corpora(self):
         with self.db() as db:
             return [{'corpus_id': c.corpus_id, 'name': c.name} for c in db.scalars(
-                select(Corpus).join(CorpusArchive).where(Corpus.owner_user_id == 1).order_by(CorpusArchive.created_at.desc()))]
+                select(Corpus).join(CorpusArchive).where(Corpus.owner_user_id == 1,
+                    ~Corpus.corpus_id.in_(select(PendingDeletion.target_id))).order_by(CorpusArchive.created_at.desc()))]
 
-    def archive_corpus(self, corpus_id):
-        with self.mutation, self.db.begin() as db:
-            self.require_corpus(db, corpus_id)
-            db.add(CorpusArchive(corpus_id=corpus_id))
-            # Keep original data and vectors for recovery; archived corpora cannot be queried.
-            ids = select(CorpusResource.resource_id).where(CorpusResource.corpus_id == corpus_id)
-            db.execute(update(IngestionJob).where(IngestionJob.resource_id.in_(ids),
-                IngestionJob.status == 'pending').values(status='cancelled'))
+    def delete_corpus(self, corpus_id):
+        with self.mutation:
+            with self.db.begin() as db:
+                corpus = db.get(Corpus, corpus_id)
+                if not corpus or corpus.owner_user_id != 1:
+                    raise LookupError('语料库不存在。')
+                db.merge(PendingDeletion(target_id=corpus_id, kind='corpus'))
+                ids = select(CorpusResource.resource_id).where(CorpusResource.corpus_id == corpus_id)
+                db.execute(update(Resource).where(Resource.resource_id.in_(ids)).values(visibility='deleting'))
+            self._finish_deletion(corpus_id)
 
-    def restore_corpus(self, corpus_id):
-        with self.mutation, self.db.begin() as db:
-            corpus, archived = db.get(Corpus, corpus_id), db.get(CorpusArchive, corpus_id)
-            if not corpus or corpus.owner_user_id != 1 or not archived:
-                raise LookupError('已删除的语料库不存在。')
-            db.delete(archived)
-            ids = select(Resource.resource_id).join(CorpusResource).where(
-                CorpusResource.corpus_id == corpus_id, Resource.visibility == 'active')
-            db.execute(update(IngestionJob).where(IngestionJob.resource_id.in_(ids),
-                IngestionJob.status == 'cancelled').values(status='pending'))
-        self.wakeup.set()
+    def _finish_deletion(self, target_id):
+        try:
+            with self.mutation, self.db.begin() as db:
+                task = db.get(PendingDeletion, target_id)
+                if not task:
+                    return
+                corpus = db.get(Corpus, target_id) if task.kind == 'corpus' else None
+                if task.kind == 'corpus':
+                    resources = list(db.scalars(select(Resource).join(CorpusResource).where(CorpusResource.corpus_id == target_id)))
+                else:
+                    resource = db.get(Resource, target_id)
+                    resources = [resource] if resource else []
+                for resource in resources:
+                    rid = resource.resource_id
+                    generations = set(db.scalars(select(IngestionJob.job_id).where(IngestionJob.resource_id == rid)))
+                    if resource.active_generation:
+                        generations.add(resource.active_generation)
+                    self.vectors.delete_generations(list(generations))
+                    originals = (self.settings.data_dir / 'originals').resolve()
+                    original = originals / f'{rid}.source'
+                    if not original.resolve().is_relative_to(originals):
+                        raise ValueError('原文文件路径异常。')
+                    original.unlink(missing_ok=True)
+                    if resource.source_type == 'builtin_bible':
+                        db.merge(BuiltinExclusion(source_id=resource.source_ref_id))
+                    for table in (IngestionJob, Fragment, ResourceVersion, CorpusResource):
+                        db.execute(delete(table).where(table.resource_id == rid))
+                    db.execute(delete(PendingDeletion).where(PendingDeletion.target_id == rid))
+                    db.delete(resource)
+                if corpus:
+                    if corpus.builtin:
+                        db.merge(BuiltinExclusion(source_id=corpus.corpus_id))
+                    db.execute(delete(CorpusArchive).where(CorpusArchive.corpus_id == target_id))
+                    db.delete(corpus)
+                self.vectors.compact_deleted()
+                db.execute(delete(PendingDeletion).where(PendingDeletion.target_id == target_id))
+        except Exception as exc:
+            log.exception('Permanent deletion pending: %s', target_id)
+            raise DeletionPending('删除尚未完成，后台会重试清理。') from exc
+
+    def process_deletions(self):
+        with self.db() as db:
+            targets = list(db.scalars(select(PendingDeletion.target_id)))
+        for target in targets:
+            self._finish_deletion(target)
 
     def resource_content(self, corpus_id, resource_id, offset=0, limit=50):
         with self.db() as db:
@@ -214,19 +260,21 @@ class Library:
         self.wakeup.set()
         return result
 
-    def archive(self, corpus_id, resource_id):
+    def delete_resource(self, corpus_id, resource_id):
         with self.mutation, self.db.begin() as db:
-            resources = {r.resource_id: r for r in self.resource_rows(db, corpus_id)}
-            if resource_id not in resources:
+            self.require_corpus(db, corpus_id)
+            resource = db.scalar(select(Resource).join(CorpusResource).where(CorpusResource.corpus_id == corpus_id,
+                Resource.resource_id == resource_id, Resource.owner_user_id == 1))
+            if not resource:
                 raise LookupError('资源不存在。')
-            resources[resource_id].visibility = 'archived'
-            db.execute(update(IngestionJob).where(IngestionJob.resource_id == resource_id,
-                IngestionJob.status == 'pending').values(status='cancelled'))
+            resource.visibility = 'deleting'
+            db.merge(PendingDeletion(target_id=resource_id, kind='resource'))
+        self._finish_deletion(resource_id)
 
     def process_one(self):
-        with self.db.begin() as db:
+        with self.mutation, self.db.begin() as db:
             job = db.scalar(select(IngestionJob).join(Resource, Resource.resource_id == IngestionJob.resource_id)
-                .where(IngestionJob.status == 'pending')
+                .where(IngestionJob.status == 'pending', Resource.visibility == 'active')
                 .order_by((Resource.source_type == 'builtin_bible').asc(), IngestionJob.created_at).limit(1))
             if not job:
                 return False
@@ -242,12 +290,15 @@ class Library:
             batch_size = self.settings.embedding_batch_size
             while True:
                 if self.stop.is_set():
-                    with self.db.begin() as db:
-                        db.get(IngestionJob, job.job_id).status = 'pending'
+                    with self.mutation, self.db.begin() as db:
+                        current = db.get(IngestionJob, job.job_id)
+                        if current:
+                            current.status = 'pending'
                     return False
-                with self.db() as db:
-                    if db.get(Resource, job.resource_id).visibility != 'active':
-                        raise ValueError('资源已归档，导入已停止。')
+                with self.mutation, self.db() as db:
+                    resource = db.get(Resource, job.resource_id)
+                    if not resource or resource.visibility != 'active' or not db.get(IngestionJob, job.job_id):
+                        return False
                     fragments = list(db.scalars(select(Fragment).where(Fragment.version_id == job.version_id,
                         Fragment.fragment_index > last_index).order_by(Fragment.fragment_index).limit(batch_size)))
                 if not fragments:
@@ -256,24 +307,37 @@ class Library:
                 spans = ((f, a, b) for f in fragments for a, b in index_spans(f.text))
                 while items := list(islice(spans, batch_size)):
                     if self.stop.is_set():
-                        with self.db.begin() as db:
-                            db.get(IngestionJob, job.job_id).status = 'pending'
+                        with self.mutation, self.db.begin() as db:
+                            current = db.get(IngestionJob, job.job_id)
+                            if current:
+                                current.status = 'pending'
                         return False
                     embeddings = self.embedder.encode([f.text[a:b] for f, a, b in items])
                     points = [PointStruct(id=str(uuid.uuid5(uuid.NAMESPACE_URL, f'{job.job_id}:{f.fragment_id}:{a}:{b}')),
                         vector=vector, payload={'generation': job.job_id, 'fragment_id': f.fragment_id,
                         'start': a, 'end': b}) for (f, a, b), vector in zip(items, embeddings, strict=True)]
-                    self.vectors.upsert(points)
+                    # Deletion may finish during inference. Check the job identity
+                    # under the same lock as delete, including a same-file reupload.
+                    with self.mutation, self.db() as db:
+                        resource = db.get(Resource, job.resource_id)
+                        if not resource or resource.visibility != 'active' or not db.get(IngestionJob, job.job_id):
+                            return False
+                        self.vectors.upsert(points)
                     del embeddings, points
                     self.stop.wait(self.settings.index_batch_pause)
                 last_index = fragments[-1].fragment_index
                 processed += len(fragments)
-                with self.db.begin() as db:
-                    db.get(IngestionJob, job.job_id).processed = processed
+                with self.mutation, self.db.begin() as db:
+                    current = db.get(IngestionJob, job.job_id)
+                    if not current:
+                        return False
+                    current.processed = processed
                 del fragments
             with self.mutation, self.db.begin() as db:
                 resource = db.get(Resource, job.resource_id)
                 current = db.get(IngestionJob, job.job_id)
+                if not resource or not current:
+                    return False
                 if resource.visibility == 'active' and resource.version_id == job.version_id:
                     old_generation = resource.active_generation
                     resource.active_generation, current.status = job.job_id, 'ready'
@@ -286,22 +350,34 @@ class Library:
                     log.exception('Old generation cleanup failed; it remains excluded from search')
         except Exception as exc:
             log.exception('Indexing failed: %s', job.resource_id)
-            with self.db.begin() as db:
+            with self.mutation, self.db.begin() as db:
                 current = db.get(IngestionJob, job.job_id)
-                current.status, current.error = 'failed', str(exc)[:1000]
+                if current:
+                    current.status, current.error = 'failed', str(exc)[:1000]
         return True
 
     def start_worker(self):
         def run():
             while not self.stop.is_set():
+                retry_delay = 2
                 try:
+                    self.process_deletions()
                     if self.process_one():
                         continue
+                except DeletionPending:
+                    retry_delay = 30
+                except Exception:
+                    log.exception('Worker failed')
+                try:
                     if hasattr(self.embedder, 'release_if_idle'):
                         self.embedder.release_if_idle()
                 except Exception:
-                    log.exception('Worker failed')
-                self.wakeup.wait(2)
+                    log.exception('Idle model cleanup failed')
+                try:
+                    self.vectors.release_if_idle()
+                except Exception:
+                    log.exception('Idle vector cache cleanup failed')
+                self.wakeup.wait(retry_delay)
                 self.wakeup.clear()
         self.worker = threading.Thread(target=run, daemon=True, name='corpus-indexer')
         self.worker.start()

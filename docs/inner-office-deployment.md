@@ -159,7 +159,7 @@ curl -f https://the-inner-office.me/Bible_talking/api/health
 
 ## 低资源更新
 
-更新 `backend/` 后重启即可启用：每批 8 条、单线程、关闭 ONNX CPU 内存池、闲置 60 秒卸载模型、每批索引暂停 0.1 秒。模型闲置后的首次搜索需要重新加载；现有语料和索引直接沿用。
+更新 `backend/` 后重启即可启用：每批 8 条、单线程、关闭 ONNX CPU 内存池、闲置 60 秒卸载模型、本地向量按需加载并在闲置 30 秒后释放、每批索引暂停 0.1 秒。模型闲置后的首次搜索需要重新加载；现有语料和索引直接沿用。
 
 已有服务安装下面的 drop-in，可保留实际的 `venv` 路径、启动参数和数据目录，同时降低运行优先级，将整个应用限制到半个 CPU 核心。先用 `systemctl cat bible-talking` 确认这是当前应用服务，再在更新后的代码目录执行：
 
@@ -182,7 +182,7 @@ ps -p "$(systemctl show bible-talking -p MainPID --value)" -o pid,%cpu,%mem,rss,
 curl -s http://127.0.0.1:18080/api/corpora
 ```
 
-`rss` 单位为 KiB；`pending_jobs` 为零表示当前索引队列处理完毕。本地 Qdrant 的向量和元数据仍在内存中，闲置卸载针对模型及推理缓冲。Linux/glibc 环境在卸载后还会尝试归还空闲堆内存。CPU 限额会降低搜索和索引速度。
+`rss` 单位为 KiB；`pending_jobs` 为零表示当前索引队列处理完毕。本地向量缓存默认在最后一次向量操作完成 30 秒后释放，模型默认在最后一次推理完成 60 秒后释放；后台正常每约 2 秒检查一次。Linux/glibc 环境在卸载后还会尝试归还空闲堆内存。CPU 限额会降低搜索和索引速度。
 
 ## 服务器无法下载模型时：使用离线模型包
 
@@ -222,3 +222,24 @@ sudo journalctl -u bible-talking -f --since '2 minutes ago'
 ```
 
 只修改 `.env` 不需要 `daemon-reload`。Nginx 配置无需变更。模型加载完成后用 `curl -f http://127.0.0.1:18080/api/health` 验证服务，内置语料索引仍会在后台建立。
+
+
+## 永久删除更新（2026-10-27）
+
+更新服务器包中的 `backend/`、`frontend/dist/` 后执行 `sudo systemctl restart bible-talking`。新增的禁用标记表和待清理任务表会自动创建。删除资源或语料库会清理原文、所有相关任务及向量，正在执行的索引会停止写回；内置圣经被删除后也不会自动重新导入。旧版归档可在页面的“旧版归档的语料库”中逐个确认永久删除。
+
+
+## 按需向量缓存更新（2026-10-27）
+
+更新 `backend/` 后重启应用，已有向量库直接沿用。默认启动不加载向量；搜索、索引或删除时按需打开，连续请求复用缓存；空闲 30 秒后自动关闭。删除完成时立即释放缓存，下次搜索加载剩余向量。
+
+```bash
+sudo systemctl restart bible-talking
+curl -s http://127.0.0.1:18080/api/health
+```
+
+新版本健康接口会返回 `"vector_cache":{"loaded":false,"idle_seconds":30}`。搜索后 `loaded` 会变为 `true`；没有新的搜索或索引操作时，约 30–32 秒后恢复为 `false`。健康检查和语料列表轮询不会续期缓存。模型另外在闲置 60 秒后释放，可以在最后一次搜索约 65 秒后观察进程 RSS。
+
+如希望更快释放，在现有 `.env` 中设置 `VECTOR_CACHE_IDLE_SECONDS=10` 并重启。该值须为正整数。缓存未加载时首次搜索需要读盘，因此会比连续搜索慢。独立 Qdrant 服务模式下 `vector_cache` 为 `null`，此设置只管理本地模式。
+
+缓存释放期间仍保留数据目录的应用锁，防止两个应用进程同时操作同一份索引任务。首次加载失败会释放连接，下次请求可重试。

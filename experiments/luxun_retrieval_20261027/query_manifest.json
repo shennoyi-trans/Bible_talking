@@ -1,0 +1,16 @@
+{
+  "sha256": "3f9f45e2e1522e2926ee0edff4975fb701a542459ab223985bd41ec416fe6e56",
+  "n_targets": 60,
+  "n_queries": 240,
+  "authorship": "keyword and paraphrase queries drafted by an AI assistant from randomly selected source fragments before retrieval outputs were computed; not collected from users",
+  "gold": "one known target fragment per query; measures known-item retrieval, not exhaustive semantic relevance",
+  "literal": "up to 16 consecutive characters from middle of longest unpunctuated clause",
+  "deletion": "one uniformly selected Chinese character deleted from each paraphrase; seed 20261027",
+  "fixed_parameters": {
+    "bm25_k1": 1.5,
+    "bm25_b": 0.75,
+    "rrf_k": 60,
+    "rrf_depth": 100
+  },
+  "analysis": "Hit@1,5,10, MRR@10; paired bootstrap over 60 target groups; separate query-type and collection analyses; 5 warm timing repetitions; corpus sizes 1000,2000,3784; all targets retained"
+}

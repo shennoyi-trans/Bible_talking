@@ -1,0 +1,52 @@
+{
+  "seed": 20261027,
+  "books": {
+    "呐喊": {
+      "parsed": 999,
+      "unique": 988
+    },
+    "彷徨": {
+      "parsed": 1036,
+      "unique": 1021
+    },
+    "野草": {
+      "parsed": 451,
+      "unique": 439
+    },
+    "朝花夕拾": {
+      "parsed": 390,
+      "unique": 389
+    },
+    "故事新编": {
+      "parsed": 988,
+      "unique": 947
+    }
+  },
+  "total_unique": 3784,
+  "selection": "12 uniformly sampled unique fragments per collection, length 60..220 Unicode characters; no result-based filtering",
+  "sources": [
+    {
+      "path": "examples\\corpora\\lu-xun\\呐喊.jsonl",
+      "sha256": "d8fe8e49f0ba35e9dda4c6bd0fc9d93790dd1c73d74d1b77444f0798054531f8"
+    },
+    {
+      "path": "examples\\corpora\\lu-xun\\彷徨.jsonl",
+      "sha256": "1f6588241eff004e879d7af233e2bcbf7ee4934d2cc917b807b83d00ddf4b93b"
+    },
+    {
+      "path": "examples\\corpora\\lu-xun\\野草.jsonl",
+      "sha256": "2e3b506108ddecb0b35c8889e044458d3d1ce7b50e7cbca4e95c43754c99335f"
+    },
+    {
+      "path": "examples\\corpora\\lu-xun\\朝花夕拾.jsonl",
+      "sha256": "80cbb5439d727ef1bae1d075a6d8c2cad4d4052b585b5199e8a921324ac446f0"
+    },
+    {
+      "path": "examples\\corpora\\lu-xun\\故事新编.jsonl",
+      "sha256": "64d0316951265a42ca45730f13fcf3eada7fb1098998c3e0e7ea583f78d99b59"
+    }
+  ],
+  "parser_sha256": "224b1d66e37551d36728eb9bd7b9afef366b1dd81b9098348786f9c32b6cd77a",
+  "vectors_sha256": "0beef828071ceed81e4f2ef904f5ed10a69f459e96a0f4b3c95e7fbd5dbc8c32",
+  "corpus_sha256": "82c39388840c5c8915b463c5fb02fe0d30c9ea139d3aa95d850fce65cac8d67e"
+}

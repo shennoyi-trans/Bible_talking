@@ -1,0 +1,7 @@
+{
+  "status": "exploratory after primary results",
+  "prefix": "为这个句子生成表示以用于检索相关文章：",
+  "source": "https://huggingface.co/BAAI/bge-small-zh-v1.5",
+  "query_sha256": "3f9f45e2e1522e2926ee0edff4975fb701a542459ab223985bd41ec416fe6e56",
+  "purpose": "original FastEmbed adapter inherits query_embed without adding model-card instruction; compare a fixed documented instruction, no tuning"
+}

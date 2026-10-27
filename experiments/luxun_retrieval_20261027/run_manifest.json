@@ -1,0 +1,20 @@
+{
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.13.5 | packaged by Anaconda, Inc. | (main, Jun 12 2025, 16:37:03) [MSC v.1929 64 bit (AMD64)]",
+  "processor": "Intel64 Family 6 Model 191 Stepping 2, GenuineIntel",
+  "packages": {
+    "numpy": "2.5.4",
+    "fastembed": "0.9.0",
+    "onnxruntime": "1.31.0",
+    "qdrant-client": "1.19.1",
+    "jieba": "0.42.1"
+  },
+  "query_sha256": "3f9f45e2e1522e2926ee0edff4975fb701a542459ab223985bd41ec416fe6e56",
+  "corpus_sha256": "82c39388840c5c8915b463c5fb02fe0d30c9ea139d3aa95d850fce65cac8d67e",
+  "evaluator_sha256": "98097015eacae76536b71c6e09d5237ef9c0c3ae9cf96ac577bd6b55eaf286c4",
+  "word_index_seconds": 1.6542604000023857,
+  "bigram_index_seconds": 0.658962800000154,
+  "implementation": "numpy exact cosine on normalized embeddings; custom posting-list BM25 with positive log1p IDF; jieba HMM=False, no stoplist; deterministic ID tie-break; word BM25 + semantic top100 RRF(k=60)",
+  "validation": "BM25 hand calculation, zero-overlap rejection, RRF hand case, stable ties, literal containment, finite unit vectors, repeated single/batch query vector consistency passed",
+  "timing_notes": "5 warm repetitions, 240 queries each; hybrid is sequential measured component sum, model load/index build excluded; no HTTP/UI overhead; CPU only"
+}

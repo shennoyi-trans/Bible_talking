@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from .config import ROOT, Settings
 from .parsers import parse_upload
-from .service import Library
+from .service import DeletionPending, Library
 
 
 class CorpusCreate(BaseModel):
@@ -65,13 +65,18 @@ def create_app(settings=None, embedder=None):
     async def invalid(_, exc):
         return JSONResponse({'detail': str(exc)}, status_code=422)
 
+    @app.exception_handler(DeletionPending)
+    async def deletion_pending(_, exc):
+        return JSONResponse({'detail': str(exc)}, status_code=503)
+
     def library():
         return app.state.library
 
     @app.get('/api/health')
     def health():
         return {'status': 'ok', 'vector_store': 'qdrant-server' if settings.qdrant_url else 'qdrant-local',
-            'embedding_model': settings.embedding_model, 'deployment': settings.deployment}
+            'embedding_model': settings.embedding_model, 'deployment': settings.deployment,
+            'vector_cache': library().vectors.cache_status()}
 
     @app.get('/api/corpora')
     def corpora():
@@ -92,14 +97,13 @@ def create_app(settings=None, embedder=None):
         return library().archived_corpora()
 
     @app.delete('/api/corpora/{corpus_id}')
-    def archive_corpus(corpus_id: str):
-        library().archive_corpus(corpus_id)
-        return {'archived': True}
+    def delete_corpus(corpus_id: str):
+        library().delete_corpus(corpus_id)
+        return {'deleted': True}
 
     @app.post('/api/corpora/{corpus_id}/restore')
     def restore_corpus(corpus_id: str):
-        library().restore_corpus(corpus_id)
-        return {'restored': True}
+        raise HTTPException(410, '语料删除后无法恢复。')
 
     @app.get('/api/corpora/{corpus_id}/resources/{resource_id}/content')
     def resource_content(corpus_id: str, resource_id: str, offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100)):
@@ -131,9 +135,9 @@ def create_app(settings=None, embedder=None):
         return library().reindex(corpus_id, resource_id)
 
     @app.delete('/api/corpora/{corpus_id}/resources/{resource_id}')
-    def archive(corpus_id: str, resource_id: str):
-        library().archive(corpus_id, resource_id)
-        return {'archived': True}
+    def delete_resource(corpus_id: str, resource_id: str):
+        library().delete_resource(corpus_id, resource_id)
+        return {'deleted': True}
 
     @app.post('/api/search')
     def search(body: SearchRequest):

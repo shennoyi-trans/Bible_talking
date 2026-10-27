@@ -2,14 +2,14 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { isNative, nativeApi } from './native'
 import { readZip, ZIP_LIMIT, FILE_LIMIT } from './zip-upload'
-import { ArrowUpRight, ArrowRight, BookOpen, Check, ChevronDown, ChevronUp, Copy, FileText, Library, LoaderCircle, Plus, Search, Upload, X, RotateCw, Archive, ArrowLeft, Trash2, MoreHorizontal } from 'lucide-vue-next'
+import { ArrowUpRight, ArrowRight, BookOpen, Check, ChevronDown, ChevronUp, Copy, FileText, Library, LoaderCircle, Plus, Search, Upload, X, RotateCw, ArrowLeft, Trash2, MoreHorizontal } from 'lucide-vue-next'
 
 const page = ref('search'), corpora = ref([]), selected = ref('corpus_cuv'), query = ref(''), results = ref([])
 const loading = ref(false), hasSearched = ref(false), searchedQuery = ref(''), error = ref(''), toast = ref('')
 const topK = ref(50), indexing = ref(false), contexts = ref({}), expanded = ref({}), contextBusy = ref({})
 const resources = ref([]), modal = ref(false), name = ref(''), description = ref(''), saving = ref(false)
 const fileInput = ref(null), file = ref(null), preview = ref(null), uploading = ref(false), drag = ref(false)
-const pendingArchive = ref(null), uploadCorpus = ref(''), previewToken = ref(0)
+const deletingResource = ref(false), pendingResourceDelete = ref(null), uploadCorpus = ref(''), previewToken = ref(0)
 const zipEntries = ref(null), zipSkipped = ref([]), uploadProgress = ref(''), uploadError = ref('')
 const chosenZipEntries = computed(() => (zipEntries.value || []).filter(entry => entry.selected))
 const zipCount = computed(() => chosenZipEntries.value.reduce((count, entry) => count + (entry.preview?.count || 0), 0))
@@ -180,9 +180,18 @@ async function reindex(resource) {
   try { await api(`/corpora/${selected.value}/resources/${resource.resource_id}/reindex`, { method: 'POST' }); notify('已开始重新准备语料。'); await refresh() }
   catch (e) { notify(e.message) }
 }
-async function archive() {
-  try { await api(`/corpora/${selected.value}/resources/${pendingArchive.value.resource_id}`, { method: 'DELETE' }); pendingArchive.value = null; notify('已从检索中移除。'); await refresh() }
-  catch (e) { notify(e.message) }
+async function deleteResource() {
+  if (!pendingResourceDelete.value || deletingResource.value) return
+  const id = pendingResourceDelete.value.resource_id
+  deletingResource.value = true
+  try {
+    await api(`/corpora/${selected.value}/resources/${id}`, { method: 'DELETE' })
+    pendingResourceDelete.value = null
+    requestNumber++; loading.value = false; results.value = []; contexts.value = {}; expanded.value = {}; hasSearched.value = false
+    if (reader.value?.resource_id === id) { reader.value = null; readerRequest++ }
+    notify('语料已永久删除。'); await refresh()
+  } catch (e) { notify(e.message) }
+  finally { deletingResource.value = false }
 }
 function chooseCorpus(id) {
   if (uploading.value) { notify('请等待当前文件处理完成后再切换语料库。'); return }
@@ -213,13 +222,10 @@ async function deleteCorpus() {
     await api(`/corpora/${id}`, { method: 'DELETE' })
     pendingCorpusDelete.value = null
     if (selected.value === id) { selected.value = ''; changeCorpus() }
-    await refresh(); notify('语料库已删除，可在“已删除的语料库”中恢复。')
+    reader.value = null; readerRequest++
+    await refresh(); notify('语料库已永久删除。')
   } catch (e) { notify(e.message) }
   finally { deletingCorpus.value = false }
-}
-async function restoreCorpus(item) {
-  try { await api(`/corpora/${item.corpus_id}/restore`, { method: 'POST' }); await refresh(); notify('语料库已恢复。') }
-  catch (e) { notify(e.message) }
 }
 async function openResource(resource, offset = 0) {
   const request = ++readerRequest
@@ -238,7 +244,7 @@ function statusText(resource) {
 function nativeBack() {
   if (reader.value) { reader.value = null; readerRequest++ }
   else if (modal.value) modal.value = false
-  else if (pendingArchive.value) pendingArchive.value = null
+  else if (pendingResourceDelete.value && !deletingResource.value) pendingResourceDelete.value = null
   else if (pendingCorpusDelete.value) pendingCorpusDelete.value = null
   else if (selectorOpen.value || corpusMenu.value) { selectorOpen.value = false; corpusMenu.value = null }
   else if (page.value === 'library') page.value = 'search'
@@ -328,20 +334,20 @@ onUnmounted(() => { clearInterval(timer); clearTimeout(toastTimer); document.rem
           <button class="resource-heading resource-disclosure" :aria-expanded="resourcesOpen" aria-controls="resource-list" :title="resourcesOpen ? '收起收录的文字' : '展开收录的文字'" @click="resourcesOpen = !resourcesOpen"><span>收录的文字 <small>{{ resources.length }}</small></span><ChevronUp v-if="resourcesOpen" :size="18" /><ChevronDown v-else :size="18" /></button>
           <div v-if="resourcesOpen" id="resource-list">
           <div v-if="!resources.length" class="empty-library">还没有文字。添加第一份语料，开始寻找。</div>
-          <div v-for="resource in resources" :key="resource.resource_id" class="resource-row"><FileText :size="20" /><div class="resource-info"><button class="resource-title" :title="`查看《${resource.title}》原文`" @click="openResource(resource)">{{ resource.title }}<ArrowUpRight :size="13" /></button><small>{{ resource.job.total }} 条原文<span v-if="resource.job.status === 'processing'"> · 已处理 {{ resource.job.processed }} 条</span></small><p v-if="resource.job.error" class="resource-error">{{ resource.job.error }}</p></div><span v-if="resource.job.status !== 'ready'" class="status" :class="resource.job.status"><span></span>{{ statusText(resource) }}</span><button class="icon-button" :aria-label="`重新处理 ${resource.title}`" :title="`重新处理 ${resource.title}`" :disabled="['pending','processing'].includes(resource.job.status)" @click="reindex(resource)"><RotateCw :size="16" /></button><button class="icon-button" :aria-label="`移除 ${resource.title}`" :title="`移除 ${resource.title}`" @click="pendingArchive = resource"><Archive :size="16" /></button></div>
+          <div v-for="resource in resources" :key="resource.resource_id" class="resource-row"><FileText :size="20" /><div class="resource-info"><button class="resource-title" :title="`查看《${resource.title}》原文`" @click="openResource(resource)">{{ resource.title }}<ArrowUpRight :size="13" /></button><small>{{ resource.job.total }} 条原文<span v-if="resource.job.status === 'processing'"> · 已处理 {{ resource.job.processed }} 条</span></small><p v-if="resource.job.error" class="resource-error">{{ resource.job.error }}</p></div><span v-if="resource.job.status !== 'ready'" class="status" :class="resource.job.status"><span></span>{{ statusText(resource) }}</span><button class="icon-button" :aria-label="`重新处理 ${resource.title}`" :title="`重新处理 ${resource.title}`" :disabled="['pending','processing'].includes(resource.job.status)" @click="reindex(resource)"><RotateCw :size="16" /></button><button class="icon-button" :aria-label="`永久删除 ${resource.title}`" :title="`永久删除 ${resource.title}`" @click="pendingResourceDelete = resource"><Trash2 :size="16" /></button></div>
           </div>
           <p v-if="corpus.builtin" class="source-note">预置语料：简体中文和合本 · <a href="https://github.com/seven1m/open-bibles" target="_blank" rel="noreferrer">Open Bibles 数据源 <ArrowUpRight :size="12" /></a> · 保留来源中的措辞与章节。</p>
         </template>
         <div v-else class="empty-library">还没有语料库，点击“新建语料库”开始。</div>
-        <details v-if="archivedCorpora.length" class="deleted-corpora"><summary>已删除的语料库（{{ archivedCorpora.length }}）</summary><div v-for="item in archivedCorpora" :key="item.corpus_id"><span>{{ item.name }}</span><button class="secondary" @click="restoreCorpus(item)">恢复</button></div></details>
+        <details v-if="archivedCorpora.length" class="deleted-corpora"><summary>旧版归档的语料库（{{ archivedCorpora.length }}）</summary><div v-for="item in archivedCorpora" :key="item.corpus_id"><span>{{ item.name }}</span><button class="secondary" @click="pendingCorpusDelete = item">永久删除</button></div></details>
       </template>
     </main>
 
     <div v-if="corpusMenu" class="corpus-context-menu" :style="{ left: `${corpusMenu.x}px`, top: `${corpusMenu.y}px` }" role="menu" aria-label="语料库操作"><button role="menuitem" @click="pendingCorpusDelete = corpusMenu.item; corpusMenu = null"><Trash2 :size="15" />删除语料库</button></div>
-    <div v-if="pendingCorpusDelete" class="modal-backdrop" @click.self="!deletingCorpus && (pendingCorpusDelete = null)"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-corpus-title"><h2 id="delete-corpus-title">删除语料库？</h2><p>删除「{{ pendingCorpusDelete.name }}」后，它将不再出现在查询列表中。可以从“已删除的语料库”恢复。</p><div class="modal-buttons"><button class="secondary" :disabled="deletingCorpus" @click="pendingCorpusDelete = null">取消</button><button class="primary" :disabled="deletingCorpus" @click="deleteCorpus">{{ deletingCorpus ? '删除中…' : '删除' }}</button></div></section></div>
+    <div v-if="pendingCorpusDelete" class="modal-backdrop" @click.self="!deletingCorpus && (pendingCorpusDelete = null)"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="delete-corpus-title"><h2 id="delete-corpus-title">永久删除语料库？</h2><p>将永久删除「{{ pendingCorpusDelete.name }}」及其中全部原文和检索数据，删除后无法恢复。</p><div class="modal-buttons"><button class="secondary" :disabled="deletingCorpus" @click="pendingCorpusDelete = null">取消</button><button class="primary" :disabled="deletingCorpus" @click="deleteCorpus">{{ deletingCorpus ? '删除中…' : '永久删除' }}</button></div></section></div>
     <div v-if="reader" class="modal-backdrop" @click.self="reader = null; readerRequest++"><section class="modal reader-modal" role="dialog" aria-modal="true" aria-labelledby="reader-title"><button class="modal-close icon-button" title="关闭原文" aria-label="关闭原文" @click="reader = null; readerRequest++"><X :size="20" /></button><h2 id="reader-title">{{ reader.title }}</h2><div v-if="readerBusy" class="loading-state">正在读取原文…</div><div v-else class="reader-content"><article v-for="part in reader.fragments" :key="part.fragment_id"><small>{{ part.citation.label }}</small><p class="serif">{{ part.text }}</p></article><p v-if="!reader.fragments.length">暂无原文。</p></div><div class="reader-pagination"><button class="secondary" :disabled="readerBusy || !reader.offset" @click="openResource(reader, Math.max(0, reader.offset - 50))">上一页</button><span>{{ reader.total ? `${reader.offset + 1}–${Math.min(reader.offset + 50, reader.total)} / ${reader.total}` : '0 条' }}</span><button class="secondary" :disabled="readerBusy || reader.offset + 50 >= reader.total" @click="openResource(reader, reader.offset + 50)">下一页</button></div></section></div>
     <div v-if="toast" class="toast" role="status"><Check :size="16" />{{ toast }}</div>
     <div v-if="modal" class="modal-backdrop" @click.self="modal = false" @keydown.esc="modal = false"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="create-title"><button class="modal-close icon-button" aria-label="关闭" @click="modal = false"><X :size="20" /></button><div class="eyebrow">收集你的表达世界</div><h2 id="create-title">新建语料库</h2><form @submit.prevent="createCorpus"><label>名称<input v-model="name" required maxlength="80" placeholder="例如：喜欢的诗、我的随笔" /></label><label>介绍 <span>可选</span><textarea v-model="description" maxlength="500" rows="3" placeholder="想在这里收集什么样的文字？"></textarea></label><button class="primary" :disabled="saving || !name.trim()" type="submit">{{ saving ? '正在创建…' : '创建语料库' }}<ArrowRight :size="16" /></button></form></section></div>
-    <div v-if="pendingArchive" class="modal-backdrop" @click.self="pendingArchive = null"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="archive-title"><h2 id="archive-title">移除这份语料？</h2><p>「{{ pendingArchive.title }}」将不再出现在检索结果中。重新上传相同文件可以恢复。</p><div class="modal-buttons"><button class="secondary" @click="pendingArchive = null">取消</button><button class="primary" @click="archive">移除</button></div></section></div>
+    <div v-if="pendingResourceDelete" class="modal-backdrop" @click.self="!deletingResource && (pendingResourceDelete = null)"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="archive-title"><h2 id="archive-title">永久删除这份语料？</h2><p>将永久删除「{{ pendingResourceDelete.title }}」的原文和检索数据，删除后无法恢复。</p><div class="modal-buttons"><button class="secondary" :disabled="deletingResource" @click="pendingResourceDelete = null">取消</button><button class="primary" :disabled="deletingResource" @click="deleteResource">{{ deletingResource ? '删除中…' : '永久删除' }}</button></div></section></div>
   </div>
 </template>

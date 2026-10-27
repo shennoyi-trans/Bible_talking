@@ -48,8 +48,8 @@ def test_open_shared_library_without_login(server):
     assert server.get(url + '/resources').status_code == 200
     assert server.delete(url, headers=HEADERS).status_code == 200
     assert server.get('/api/corpora').json() == []
-    assert server.post(url + '/restore', headers=HEADERS).status_code == 200
-    assert server.get('/api/corpora').json()[0]['corpus_id'] == corpus
+    assert server.post(url + '/restore', headers=HEADERS).status_code == 410
+    assert server.get('/api/corpora').json() == []
 
 
 def test_server_origin_check_and_explicit_api_requests(server):

@@ -74,7 +74,7 @@ def test_small_corpus_is_complete_and_isolated(library):
     results = library.search(small, '喝水')['results']
     assert len(results) == 2
     assert all(r['resource_id'] == imported['resource_id'] for r in results)
-    library.archive(small, imported['resource_id'])
+    library.delete_resource(small, imported['resource_id'])
     assert library.search(small, '喝水')['results'] == []
     with pytest.raises(LookupError):
         library.context(other, results[0]['fragment_id'])
@@ -154,11 +154,11 @@ def test_bundled_corpus_provenance():
     assert '请你给我水喝' in john['text']
 
 
-def test_reupload_restores_cancelled_resource(library):
+def test_reupload_after_hard_delete_creates_new_job(library):
     corpus = library.create_corpus('测试')
     records = [{'text': '请给我一杯水。'}]
     original = import_records(library, corpus, records)
-    library.archive(corpus, original['resource_id'])
+    library.delete_resource(corpus, original['resource_id'])
     assert not library.process_one()
     restored = import_records(library, corpus, records)
     assert restored['resource_id'] == original['resource_id']
@@ -167,7 +167,7 @@ def test_reupload_restores_cancelled_resource(library):
     assert len(library.search(corpus, '喝水')['results']) == 1
 
 
-def test_corpus_deletion_restore_and_reader(tmp_path):
+def test_corpus_hard_deletion_and_reader(tmp_path):
     settings = Settings(data_dir=tmp_path, preload=False, worker_enabled=False, dimensions=16, collection='test')
     with TestClient(create_app(settings, TestEmbedder())) as client:
         lib = client.app.state.library
@@ -187,17 +187,16 @@ def test_corpus_deletion_restore_and_reader(tmp_path):
         assert client.get(f'/api/corpora/{other}/resources/{record["resource_id"]}/content').status_code == 404
         assert client.delete(url).status_code == 200
         assert [c['corpus_id'] for c in client.get('/api/corpora').json()] == [other]
-        assert client.get('/api/corpora/archived').json()[0]['corpus_id'] == corpus
+        assert client.get('/api/corpora/archived').json() == []
         assert client.get(content_url).status_code == 404
         assert client.post('/api/search', json={'corpus_id': corpus, 'query': '原文'}).status_code == 404
         with lib.db() as db:
-            assert db.get(IngestionJob, pending['job_id']).status == 'cancelled'
+            assert db.get(IngestionJob, pending['job_id']) is None
             assert db.get(IngestionJob, untouched['job_id']).status == 'pending'
-        assert client.post(url + '/restore').status_code == 200
-        assert len(client.post('/api/search', json={'corpus_id': corpus, 'query': '原文'}).json()['results']) == 50
+        assert client.post(url + '/restore').status_code == 410
         assert client.get('/api/corpora/archived').json() == []
         with lib.db() as db:
-            assert db.get(IngestionJob, pending['job_id']).status == 'pending'
+            assert db.get(IngestionJob, pending['job_id']) is None
         assert client.delete('/api/corpora/missing').status_code == 404
 
 
@@ -205,14 +204,12 @@ def test_deleted_builtin_stays_deleted_after_restart(tmp_path):
     settings = Settings(data_dir=tmp_path, preload=False, worker_enabled=False, dimensions=16, collection='test')
     lib = Library(settings, TestEmbedder())
     lib.create_corpus('圣经', builtin=True, corpus_id='corpus_cuv')
-    lib.archive_corpus('corpus_cuv')
+    lib.delete_corpus('corpus_cuv')
     lib.close()
     lib = Library(settings, TestEmbedder())
     try:
         lib.bootstrap()
         assert lib.list_corpora() == []
-        assert lib.archived_corpora()[0]['corpus_id'] == 'corpus_cuv'
-        lib.restore_corpus('corpus_cuv')
-        assert lib.list_corpora()[0]['corpus_id'] == 'corpus_cuv'
+        assert lib.archived_corpora() == []
     finally:
         lib.close()

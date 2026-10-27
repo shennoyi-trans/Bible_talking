@@ -38,3 +38,31 @@
 ## 部署
 
 服务器更新步骤见 [低资源更新](inner-office-deployment.md#低资源更新)。安装 systemd drop-in 后，应用 CPU 配额为半个核心，并降低 CPU/I/O 权重，保留原有 ExecStart、虚拟环境和数据路径。此轮未连接服务器，Linux 内存回收和 systemd 限额需在更新后按部署文档观察。
+
+
+## 按需向量缓存验证（2026-10-27）
+
+本轮把本地 Qdrant 改为惰性打开，默认缓存闲置 30 秒后释放。语料列表、原文与健康检查只读元数据库，不打开向量缓存；索引写入和搜索刷新缓存使用时间，删除完成则立即释放。加载、搜索、写入和释放使用同一把锁，避免并发冷请求重复打开或在查询过程中关闭连接。应用整个生命周期保留独立目录锁，空闲回收不会放开单进程约束。
+
+测试使用 Windows / Python 3.13.5，两个独立进程读取同一份 **20,000 条、512 维**的合成持久化向量库；没有加载嵌入模型，也没有打开业务数据库。
+
+| 指标 | 原来启动加载并常驻 | 按需缓存 |
+| --- | ---: | ---: |
+| 启动后工作集 | 530.4 MiB | 116.4 MiB |
+| 搜索后工作集 | 531.1 MiB | 529.5 MiB |
+| 空闲回收后工作集 | 531.1 MiB | 161.1 MiB |
+| 第二次加载并回收后工作集 | — | 167.4 MiB |
+| 首次搜索耗时 | 0.323 秒（启动已加载） | 1.761 秒（包含加载） |
+| 缓存命中搜索耗时 | 0.276 秒 | 0.316 秒 |
+
+启动工作集下降约 78%，空闲回收后下降约 70%。所有搜索返回的 20 个结果 ID 与顺序一致。内存基准通过调整最后使用时间触发真实回收；另有应用端到端测试使用实际的 1 秒空闲设置，持续轮询健康和语料列表，验证后台自动释放以及下一次搜索重新加载。
+
+复现命令（准备目录必须是不存在的新目录；只创建合成测试数据）：
+
+```powershell
+.venv\Scripts\python.exe scripts\benchmark_vector_cache.py --prepare --data-dir data\test-runs\vector-cache-benchmark
+.venv\Scripts\python.exe scripts\benchmark_vector_cache.py --baseline --data-dir data\test-runs\vector-cache-benchmark --output data\test-runs\vector-cache-baseline.json
+.venv\Scripts\python.exe scripts\benchmark_vector_cache.py --data-dir data\test-runs\vector-cache-benchmark --output data\test-runs\vector-cache-lazy.json
+```
+
+后端完整套件 37 项通过；补充真实计时回收测试后，向量缓存专项 8 项全部通过，共覆盖 38 个测试用例。覆盖启动无加载、健康轮询不续期、缓存复用和重载、并发首次请求只打开一次、查询中不回收、目录锁、初始化失败重试，并保留上一轮硬删除的全部验证。

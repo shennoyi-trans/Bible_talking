@@ -19,11 +19,41 @@ async function initialize() {
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
   }) || { corpora: [], resources: [], archived: [], hidden: [] }
+  state.deletedCorpora ||= []
+  state.deletedResources ||= []
+  pruneBuiltin()
   for (const resource of state.resources) if (resource.job.status === 'processing') { resource.job.status = 'pending'; resource.job.processed = 0 }
   setTimeout(processJobs, 0)
 }
 // Attach rejection handling immediately; each API call still receives the initialization error.
 ready.catch(() => {})
+function pruneBuiltin() {
+  if (!state.deletedCorpora.length && !state.deletedResources.length) return
+  const removed = new Set(state.deletedResources)
+  if (state.deletedCorpora.includes('corpus_cuv')) seed.resources.forEach(r => removed.add(r.resource_id))
+  seed.corpora = seed.corpora.filter(c => !state.deletedCorpora.includes(c.corpus_id))
+  seed.resources = seed.resources.filter(r => !removed.has(r.resource_id))
+  const remap = new Map(), kept = []
+  seed.fragments.forEach((f, i) => { if (!removed.has(f.resource_id)) { remap.set(i, kept.length); kept.push(f) } })
+  const indices = [], spans = []
+  seed.spans.forEach(([i, start, end], row) => {
+    if (remap.has(i)) { indices.push(row); spans.push([remap.get(i), start, end]) }
+  })
+  const packed = new Float32Array(indices.length * 512)
+  indices.forEach((row, i) => packed.set(vectors.subarray(row * 512, (row + 1) * 512), i * 512))
+  seed.fragments = kept; seed.spans = spans; vectors = packed
+}
+function removeResources(ids) {
+  const removed = new Set(ids)
+  for (const resource of state.resources) if (removed.has(resource.resource_id)) {
+    resource.job.status = 'cancelled'
+    resource.fragments = []; delete resource.text; delete resource.vectors; delete resource.spans
+  }
+  state.resources = state.resources.filter(r => !removed.has(r.resource_id))
+  state.hidden = state.hidden.filter(id => !removed.has(id))
+  state.deletedResources.push(...seed.resources.filter(r => removed.has(r.resource_id)).map(r => r.resource_id))
+  pruneBuiltin()
+}
 function save() {
   return new Promise((resolve, reject) => {
     const tx = db.transaction('library', 'readwrite')
@@ -75,7 +105,9 @@ async function processJobs() {
           if (state.archived.includes(resource.corpus_id) || state.hidden.includes(resource.resource_id)) { resource.job.status = 'cancelled'; break }
           const fragment = resource.fragments[i], chars = Array.from(fragment.text)
           for (const [start, end] of indexSpans(fragment.text)) {
-            rows.push(await encode(chars.slice(start, end).join(''))); spans.push([i, start, end])
+            const vector = await encode(chars.slice(start, end).join(''))
+            if (!state.resources.includes(resource) || resource.job.status === 'cancelled') break
+            rows.push(vector); spans.push([i, start, end])
           }
           resource.job.processed = i + 1
           if (i % 20 === 0) await save()
@@ -127,17 +159,22 @@ async function route(path, method, body) {
   if (parts[0] !== 'corpora') throw Error('接口不存在。')
   const id = parts[1]
   if (parts[2] === 'restore' && method === 'POST') {
-    if (!state.archived.includes(id)) throw Error('已删除的语料库不存在。')
+    throw Error('语料删除后无法恢复。')
+  }
+  if (parts.length === 2 && method === 'DELETE') {
+    const corpus = corpora().find(c => c.corpus_id === id)
+    if (!corpus) throw Error('语料库不存在。')
+    const ids = state.resources.filter(r => r.corpus_id === id).map(r => r.resource_id)
+    if (corpus.builtin) {
+      ids.push(...seed.resources.map(r => r.resource_id))
+      state.deletedCorpora.push(id)
+    }
+    removeResources(ids)
+    state.corpora = state.corpora.filter(c => c.corpus_id !== id)
     state.archived = state.archived.filter(value => value !== id)
-    for (const r of state.resources) if (r.corpus_id === id && r.job.status === 'cancelled' && !state.hidden.includes(r.resource_id)) r.job.status = 'pending'
-    await save(); processJobs(); return { restored: true }
+    await save(); return { deleted: true }
   }
   requireCorpus(id)
-  if (parts.length === 2 && method === 'DELETE') {
-    state.archived.push(id)
-    for (const r of state.resources) if (r.corpus_id === id && ['pending', 'processing'].includes(r.job.status)) r.job.status = 'cancelled'
-    await save(); return { archived: true }
-  }
   if (parts[2] === 'context') {
     const target = [...seed.fragments, ...state.resources.flatMap(r => r.fragments)].find(f => f.fragment_id === url.searchParams.get('fragment_id'))
     if (!target) throw Error('片段不存在。')
@@ -180,9 +217,8 @@ async function route(path, method, body) {
     return resource.job
   }
   if (method === 'DELETE') {
-    state.hidden.push(resource.resource_id)
-    if (['pending', 'processing'].includes(resource.job.status)) resource.job.status = 'cancelled'
-    await save(); return { archived: true }
+    removeResources([resource.resource_id])
+    await save(); return { deleted: true }
   }
   throw Error('接口不存在。')
 }

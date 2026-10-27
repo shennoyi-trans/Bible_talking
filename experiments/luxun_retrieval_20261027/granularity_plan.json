@@ -1,0 +1,6 @@
+{
+  "status": "exploratory, specified after primary analysis; queries unchanged",
+  "rule": "split at Chinese/ASCII sentence-final marks and semicolons; retain >=8 alphanumeric or Chinese characters; retain paragraph view; max score over views per original fragment",
+  "n_additional_views": 8015,
+  "query_sha256": "3f9f45e2e1522e2926ee0edff4975fb701a542459ab223985bd41ec416fe6e56"
+}

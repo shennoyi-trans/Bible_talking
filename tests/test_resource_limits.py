@@ -15,6 +15,7 @@ from test_library import TestEmbedder, import_records
 @pytest.mark.parametrize('values', [
     {'embedding_batch_size': 0}, {'embedding_threads': 0},
     {'embedding_idle_seconds': 0}, {'index_batch_pause': -1},
+    {'vector_cache_idle_seconds': 0},
     {'index_batch_pause': float('nan')}, {'index_batch_pause': float('inf')},
 ])
 def test_invalid_resource_limits(values):

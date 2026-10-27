@@ -1,0 +1,10 @@
+{
+  "count": 240,
+  "dimensions": 512,
+  "seconds": 1.5812566999993578,
+  "batch": 16,
+  "threads": 2,
+  "model": "BAAI/bge-small-zh-v1.5",
+  "input_sha256": "3f9f45e2e1522e2926ee0edff4975fb701a542459ab223985bd41ec416fe6e56",
+  "vector_sha256": "0a75658bef500181a56fc7d125330d5f2b22706a382ff1668e7dffc5f7e12853"
+}
